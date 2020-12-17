@@ -99,8 +99,10 @@ checksum = "2c0df63cb2955042487fad3aefd2c6e3ae7389ac5dc1beb28921de0b69f779d4"
 name = "api"
 version = "0.1.0"
 dependencies = [
+ "env_logger 0.8.2",
  "juniper",
  "juniper_warp",
+ "log",
  "rpc",
  "structopt",
  "thiserror",

@@ -46,6 +46,15 @@ services:
       - ./docker-volume/postgres/db:/var/lib/postgresql/data
       - ./docker-volume/postgres/init:/docker-entrypoint-initdb.d
 
+  victoria_metrics:
+    image: victoriametrics/victoria-metrics:latest
+    ports:
+      - "50105:50105"
+      - "8428:8428"
+    command: -opentsdbHTTPListenAddr :50105 -retentionPeriod 0
+    volumes:
+      - ./docker-volume/victoria_metrics/db:/victoria-metrics-data
+
   schema_registry:
     image: cdl-schema-registry:latest
     build:
@@ -172,11 +181,18 @@ services:
       INPUT_PORT: 50104
       RUST_LOG: debug
 
-  victoria_metrics:
-    image: victoriametrics/victoria-metrics:latest
+  web_api:
+    image: cdl-api:latest
+    command: "/bin/api"
     ports:
-      - "50105:50105"
-      - "8428:8428"
-    command: -opentsdbHTTPListenAddr :50105 -retentionPeriod 0
-    volumes:
-      - ./docker-volume/victoria_metrics/db:/victoria-metrics-data
+      - "50106:50106"
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        - BIN=api
+    environment:
+      INPUT_PORT: 50106
+      RUST_LOG: debug
+      SCHEMA_REGISTRY_ADDR: "http://schema_registry:50101"
+      QUERY_ROUTER_ADDR: "http://query_router:50103"
