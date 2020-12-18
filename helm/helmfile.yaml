@@ -1,40 +1,24 @@
+repositories:
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
+  - name: victoriametrics
+    url: https://victoriametrics.github.io/helm-charts
+
 releases:
   - name: cdl
     namespace: cdl
     createNamespace: true
     chart: ./cdl
-  - name: druid
+  - name: infrastructure
     namespace: cdl
-    chart: ./cdl/charts/druid-timeseries
-  - name: postgres-document
-    namespace: cdl
-    chart: ./cdl/charts/postgres-document
-  - name: sled-document
-    namespace: cdl
-    chart: ./cdl/charts/sled-document
-  - name: victoria-metrics
-    namespace: cdl
-    chart: ./cdl/charts/victoria-metrics-timeseries
+    chart: ./helm-infrastructure
 
 environments:
   production:
     values:
       - ./cdl/values.yaml
-      - global:
-          imageRepositoryPath: ""
-          imageVersion: latest
-          imagePullPolicy: IfNotPresent
-          kafkaBrokers:  infrastructure-kafka-headless
-          cdlImagePullSecrets: services
-          reportTopic: cdl.errors
+      - ./helm-infrastructure/values.yaml
   local:
     values:
       - ./cdl/values-local.yaml
-      - global:
-          imageRepositoryPath: epiphanyplatform/
-          imageVersion: master
-          imagePullPolicy: Always
-          kafkaBrokers: 10.1.5.4:9092
-          cdlImagePullSecrets: services
-          reportTopic: cdl.errors
-
+      - ./helm-infrastructure/values.yaml
