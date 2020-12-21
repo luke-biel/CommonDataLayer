@@ -13,13 +13,13 @@ This crate is under heavy work-in-progress. It may change a lot with breaking ch
 * [x] Update schema with new version
 * [x] Get all schemas with all views and definitions
 * [x] Add view
-* [ ] Update schema parameters:
-  * [ ] Name
-  * [ ] Topic
-  * [ ] Query address
-  * [ ] Type
+* [x] Update schema parameters:
+  * [x] Name
+  * [x] Topic
+  * [x] Query address
+  * [x] Type
 * [ ] Update view
-* [ ] Get single schema
+* [x] Get single schema
 * [ ] Get single view
 * [ ] Documentation comments
 
