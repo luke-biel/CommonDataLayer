@@ -1,16 +1,14 @@
-use anyhow::Context;
-use bb8_postgres::bb8::{Pool, PooledConnection};
-use bb8_postgres::tokio_postgres::config::Config as PgConfig;
-use bb8_postgres::tokio_postgres::{types::ToSql, NoTls, Row, SimpleQueryMessage};
-use bb8_postgres::PostgresConnectionManager;
 use log::trace;
 use rpc::query_service::query_service_server::QueryService;
 use rpc::query_service::{ObjectIds, RawStatement, SchemaId, ValueBytes, ValueMap};
 use serde_json::Value;
+use sqlx::pool::PoolConnection;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgRow};
+use sqlx::{PgPool, Postgres, Row};
 use std::collections::HashMap;
 use structopt::StructOpt;
 use tonic::{Request, Response, Status};
-use utils::{metrics::counter, psql::validate_schema};
+use utils::metrics::counter;
 use uuid::Uuid;
 
 #[derive(Debug, StructOpt)]
@@ -25,103 +23,48 @@ pub struct PsqlConfig {
     port: u16,
     #[structopt(long, env = "POSTGRES_DBNAME")]
     dbname: String,
-    #[structopt(long, env = "POSTGRES_SCHEMA", default_value = "public")]
-    schema: String,
 }
 
 pub struct PsqlQuery {
-    pool: Pool<PostgresConnectionManager<NoTls>>,
-    schema: String,
+    pool: PgPool,
 }
 
 impl PsqlQuery {
     pub async fn load(config: PsqlConfig) -> anyhow::Result<Self> {
-        let mut pg_config = PgConfig::new();
-        pg_config
-            .user(&config.username)
-            .password(&config.password)
-            .host(&config.host)
-            .port(config.port)
-            .dbname(&config.dbname);
-        let manager = PostgresConnectionManager::new(pg_config, NoTls);
-        let pool = Pool::builder()
-            .build(manager)
-            .await
-            .context("Failed to build connection pool")?;
+        let pool = PgPoolOptions::new()
+            .connect_with(
+                PgConnectOptions::new()
+                    .username(&config.username)
+                    .password(&config.password)
+                    .host(&config.host)
+                    .port(config.port)
+                    .database(&config.dbname),
+            )
+            .await?;
 
-        let schema = config.schema;
-
-        if !validate_schema(&schema) {
-            anyhow::bail!(
-                "Schema `{}` has invalid name. It can contain only ascii letters, numbers and underscores",
-                schema
-            );
-        }
-
-        Ok(Self { pool, schema })
+        Ok(Self { pool })
     }
 
-    async fn connect(
-        &self,
-    ) -> Result<PooledConnection<'_, PostgresConnectionManager<NoTls>>, Status> {
+    async fn connect(&self) -> Result<PoolConnection<Postgres>, Status> {
         self.pool
-            .get()
+            .acquire()
             .await
             .map_err(|err| Status::internal(format!("Unable to connect to database: {}", err)))
     }
+}
 
-    async fn make_query(
-        &self,
-        query: &str,
-        args: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<Row>, Status> {
-        let connection = self.connect().await?;
-        let statement = connection.prepare(query).await.map_err(|err| {
-            Status::internal(format!("Unable to prepare query statement: {}", err))
-        })?;
+struct ObjectView {
+    object_id: Uuid,
+    payload: Value,
+}
 
-        connection
-            .query(&statement, args)
-            .await
-            .map_err(|err| Status::internal(format!("Unable to query data: {}", err)))
-    }
-
-    fn collect_id_payload_rows(rows: Vec<Row>) -> HashMap<String, Vec<u8>> {
-        rows.into_iter()
-            .map(|row| {
-                let object_id = row.get::<usize, Uuid>(0).to_string();
-                let value = row.get::<usize, Value>(1).to_string().into_bytes();
-                (object_id, value)
-            })
-            .collect()
-    }
-
-    fn collect_simple_query_messages(messages: Vec<SimpleQueryMessage>) -> Result<Vec<u8>, String> {
-        let data: Vec<Vec<String>> = messages
+fn collect_value_map(value: Vec<ObjectView>) -> Result<ValueMap, serde_json::Error> {
+    Ok(ValueMap {
+        values: value
             .into_iter()
-            .map(|msg| match msg {
-                SimpleQueryMessage::Row(row) => {
-                    let mut fields: Vec<String> = Vec::new();
-                    for i in 0..row.len() {
-                        fields.push(
-                            row.try_get(i)
-                                .map_err(|e| {
-                                    format!("Error getting data from row at column {}: {}", i, e)
-                                })?
-                                .unwrap_or("")
-                                .to_string(),
-                        );
-                    }
-                    Ok(fields)
-                }
-                SimpleQueryMessage::CommandComplete(command) => Ok(vec![command.to_string()]),
-                _ => Err("Could not match SimpleQueryMessage".to_string()),
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(serde_json::to_vec(&data)
-            .map_err(|e| format!("Error serializing data to json: {}", e))?)
-    }
+            .map(|row| Ok((row.object_id.to_string(), serde_json::to_vec(&row.payload)?)))
+            .collect::<Result<HashMap<_, _>, serde_json::Error>>()?,
+    })
 }
 
 #[tonic::async_trait]
@@ -143,26 +86,31 @@ impl QueryService for PsqlQuery {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|err| Status::invalid_argument(err.to_string()))?;
 
-        let query_str = format!(
-            "SELECT d.object_id, d.payload \
-                 FROM (\
-                     SELECT object_id, max(version) as max \
-                     FROM {}.data \
-                     WHERE object_id = ANY($1) \
-                     GROUP BY object_id\
-                 ) maxes \
-                 JOIN {}.data d \
-                 ON d.object_id = maxes.object_id AND d.version = maxes.max",
-            self.schema, self.schema
-        );
+        let mut conn = self
+            .connect()
+            .await
+            .map_err(|err| Status::unavailable(err.to_string()))?;
 
-        let rows = self
-            .make_query(query_str.as_str(), &[&object_ids.as_slice()])
-            .await?;
+        let response = sqlx::query_as!(
+            ObjectView,
+            r#"SELECT d.object_id, d.payload
+                 FROM (
+                     SELECT object_id, max(version) as max
+                     FROM data
+                     WHERE object_id = any($1)
+                     GROUP BY object_id
+                 ) maxes
+                 JOIN data d
+                 ON d.object_id = maxes.object_id AND d.version = maxes.max"#,
+            object_ids.as_slice()
+        )
+        .fetch_all(&mut conn)
+        .await
+        .map_err(|err| Status::not_found(err.to_string()))?;
 
-        Ok(tonic::Response::new(ValueMap {
-            values: Self::collect_id_payload_rows(rows),
-        }))
+        Ok(tonic::Response::new(
+            collect_value_map(response).map_err(|err| Status::internal(err.to_string()))?,
+        ))
     }
 
     async fn query_by_schema(
@@ -180,22 +128,29 @@ impl QueryService for PsqlQuery {
             .parse::<Uuid>()
             .map_err(|err| Status::invalid_argument(err.to_string()))?;
 
-        let query_str = format!(
-            "SELECT object_id, payload \
-                 FROM {}.data d1 \
-                 WHERE schema_id = $1 AND d1.version = (\
-                     SELECT MAX(version) \
-                     FROM {}.data d2 \
-                     WHERE d2.object_id = d1.object_id\
-                 )",
-            self.schema, self.schema
-        );
+        let mut conn = self
+            .connect()
+            .await
+            .map_err(|err| Status::unavailable(err.to_string()))?;
 
-        let rows = self.make_query(query_str.as_str(), &[&schema_id]).await?;
+        let response = sqlx::query_as!(
+            ObjectView,
+            r#"SELECT object_id, payload
+                 FROM data d1
+                 WHERE schema_id = $1 AND d1.version = (
+                     SELECT MAX(version)
+                     FROM data d2
+                     WHERE d2.object_id = d1.object_id
+                 )"#,
+            schema_id
+        )
+        .fetch_all(&mut conn)
+        .await
+        .map_err(|err| Status::not_found(err.to_string()))?;
 
-        Ok(tonic::Response::new(ValueMap {
-            values: Self::collect_id_payload_rows(rows),
-        }))
+        Ok(tonic::Response::new(
+            collect_value_map(response).map_err(|err| Status::internal(err.to_string()))?,
+        ))
     }
 
     async fn query_raw(
@@ -203,18 +158,28 @@ impl QueryService for PsqlQuery {
         request: Request<RawStatement>,
     ) -> Result<Response<ValueBytes>, Status> {
         counter!("cdl.query-service.query_raw.psql", 1);
-        let connection = self.connect().await?;
-        let messages = connection
-            .simple_query(request.into_inner().raw_statement.as_str())
+        let raw = request.into_inner().raw_statement;
+
+        let mut conn = self
+            .connect()
             .await
-            .map_err(|err| Status::internal(format!("Unable to query_raw data: {}", err)))?;
+            .map_err(|err| Status::unavailable(err.to_string()))?;
+
+        let response = sqlx::query(raw.as_str())
+            .map(|row: PgRow| {
+                let mut fields: Vec<String> = Vec::new();
+                for col_idx in 0..row.len() {
+                    fields.push(row.get(col_idx))
+                }
+                fields
+            })
+            .fetch_all(&mut conn)
+            .await
+            .map_err(|err| Status::not_found(err.to_string()))?;
 
         Ok(tonic::Response::new(ValueBytes {
-            value_bytes: Self::collect_simple_query_messages(messages).map_err(|err| {
-                Status::internal(format!(
-                    "Unable to collect simple query messages data: {}",
-                    err
-                ))
+            value_bytes: serde_json::to_vec(&response).map_err(|err| {
+                Status::internal(format!("Unable to collect query messages data: {}", err))
             })?,
         }))
     }

@@ -1,0 +1,55 @@
+{
+  "db": "PostgreSQL",
+  "76ff55d3b754d67c240c1129c3deb6ea15fc181b2cbcc48d280b6f8f93a7544f": {
+    "query": "SELECT d.object_id, d.payload\n                 FROM (\n                     SELECT object_id, max(version) as max\n                     FROM data\n                     WHERE object_id = any($1)\n                     GROUP BY object_id\n                 ) maxes\n                 JOIN data d\n                 ON d.object_id = maxes.object_id AND d.version = maxes.max",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "object_id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "payload",
+          "type_info": "Json"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "9a0d994e912e6bfe4f2b59140705b4b6195f9bc4b972d0e9cb47302ee91d2e91": {
+    "query": "SELECT object_id, payload\n                 FROM data d1\n                 WHERE schema_id = $1 AND d1.version = (\n                     SELECT MAX(version)\n                     FROM data d2\n                     WHERE d2.object_id = d1.object_id\n                 )",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "object_id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "payload",
+          "type_info": "Json"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  }
+}

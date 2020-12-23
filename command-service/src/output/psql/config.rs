@@ -12,6 +12,4 @@ pub struct PostgresOutputConfig {
     pub port: u16,
     #[structopt(long, env = "POSTGRES_DBNAME")]
     pub dbname: String,
-    #[structopt(long, env = "POSTGRES_SCHEMA", default_value = "public")]
-    pub schema: String,
 }

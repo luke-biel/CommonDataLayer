@@ -1,59 +1,55 @@
-use std::time;
-
 use crate::communication::resolution::Resolution;
 use crate::output::OutputPlugin;
-use bb8::Pool;
-use bb8_postgres::tokio_postgres::types::Json;
-use bb8_postgres::tokio_postgres::{Config, NoTls};
-use bb8_postgres::PostgresConnectionManager;
 pub use config::PostgresOutputConfig;
 pub use error::Error;
 use log::{error, trace};
 use serde_json::Value;
+use sqlx::pool::PoolConnection;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use sqlx::{PgPool, Postgres};
 use utils::message_types::BorrowedInsertMessage;
-use utils::{metrics::counter, psql::validate_schema};
+use utils::metrics::counter;
 
 pub mod config;
 pub mod error;
 
 pub struct PostgresOutputPlugin {
-    pool: Pool<PostgresConnectionManager<NoTls>>,
-    schema: String,
+    pool: PgPool,
 }
 
 impl PostgresOutputPlugin {
     pub async fn new(config: PostgresOutputConfig) -> Result<Self, Error> {
-        let mut pg_config = Config::new();
-        pg_config
-            .user(&config.username)
-            .password(&config.password)
-            .host(&config.host)
-            .port(config.port)
-            .dbname(&config.dbname);
-        let manager = bb8_postgres::PostgresConnectionManager::new(pg_config, NoTls);
-        let pool = bb8::Pool::builder()
-            .max_size(20)
-            .connection_timeout(time::Duration::from_secs(120))
-            .build(manager)
+        let pool = PgPoolOptions::new()
+            .max_connections(20)
+            .connect_with(
+                PgConnectOptions::new()
+                    .username(&config.username)
+                    .password(&config.password)
+                    .host(&config.host)
+                    .port(config.port)
+                    .database(&config.dbname),
+            )
             .await
             .map_err(Error::FailedToConnect)?;
-        let schema = config.schema;
 
-        if !validate_schema(&schema) {
-            return Err(Error::InvalidSchemaName(schema));
-        }
+        Ok(Self { pool })
+    }
 
-        Ok(Self { pool, schema })
+    async fn connect(&self) -> Result<PoolConnection<Postgres>, Error> {
+        self.pool
+            .acquire()
+            .await
+            .map_err(Error::FailedToAcquirePooledConnection)
     }
 }
 
 #[async_trait::async_trait]
 impl OutputPlugin for PostgresOutputPlugin {
     async fn handle_message(&self, msg: BorrowedInsertMessage<'_>) -> Resolution {
-        let connection = match self.pool.get().await {
+        let mut connection = match self.connect().await {
             Ok(conn) => conn,
             Err(err) => {
-                error!("Failed to get connection from pool {:?}", err);
+                error!("Failed to connect to database - {}", err);
                 return Resolution::CommandServiceFailure;
             }
         };
@@ -65,22 +61,15 @@ impl OutputPlugin for PostgresOutputPlugin {
             Err(_err) => return Resolution::CommandServiceFailure,
         };
 
-        let store_query = format!(
-            "INSERT INTO {}.data (object_id, version, schema_id, payload) VALUES ($1, $2, $3, $4)",
-            &self.schema
-        );
-
-        let store_result = connection
-            .query(
-                store_query.as_str(),
-                &[
-                    &msg.object_id,
-                    &msg.timestamp,
-                    &msg.schema_id,
-                    &Json(payload),
-                ],
-            )
-            .await;
+        let store_result = sqlx::query!(
+            "INSERT INTO data (object_id, version, schema_id, payload) VALUES ($1, $2, $3, $4)",
+            &msg.object_id,
+            &msg.timestamp,
+            &msg.schema_id,
+            payload,
+        )
+        .execute(&mut connection)
+        .await;
 
         trace!("PSQL `INSERT` {:?}", store_result);
 

@@ -22,4 +22,4 @@ def registry_create_schema(url, name, topic, query, body):
 
 
 def query_get_single(url, schema_id, object_id):
-    return requests.get(f"{url}/single/{object_id}", headers={'SCHEMA_ID': schema_id})
+    return requests.post(f"{url}/single/{object_id}", headers={'SCHEMA_ID': schema_id}, json={})

@@ -1,0 +1,18 @@
+{
+  "db": "PostgreSQL",
+  "e3817479bb8dc29cbdb9d13f2b9585e56bfd937bdf7732f5aec7fe05d0912a8c": {
+    "query": "INSERT INTO data (object_id, version, schema_id, payload) VALUES ($1, $2, $3, $4)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8",
+          "Uuid",
+          "Json"
+        ]
+      },
+      "nullable": []
+    }
+  }
+}
