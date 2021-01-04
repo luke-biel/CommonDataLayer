@@ -14,15 +14,6 @@ services:
     environment:
       KAFKA_CREATE_TOPICS: "cdl.data.input:1:1,cdl.document.input:1:1,cdl.reports:1:1,cdl.timeseries.input:1:1"
 
-  victoria_metrics:
-    image: victoriametrics/victoria-metrics:latest
-    ports:
-      - "50105:50105"
-      - "8428:8428"
-    command: -opentsdbHTTPListenAddr :50105 -retentionPeriod 0
-    volumes:
-      - ./docker-volume/victoria_metrics/db:/victoria-metrics-data
-
   schema_registry:
     image: cdl-schema-registry:latest
     build:
