@@ -35,7 +35,7 @@ services:
       IMPORT_FILE: "/var/data/schema.json"
       RUST_LOG: info,schema_registry=trace
     volumes:
-      - ./initial-schema.json:/var/data/schema.json
+      - ./setup/initial-schema.json:/var/data/schema.json
     depends_on:
       - kafka
 
