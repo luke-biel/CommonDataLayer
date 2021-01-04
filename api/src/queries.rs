@@ -83,7 +83,6 @@ impl QueryMut {
         .map_err(rpc::error::registry_error)?;
 
         Ok(Definition {
-            queried_version: version.clone(),
             definition,
             version,
         })
@@ -206,7 +205,6 @@ impl Schema {
 
         Ok(Definition {
             version: schema_def.version,
-            queried_version: version,
             definition: schema_def.definition,
         })
     }
@@ -232,7 +230,7 @@ impl Schema {
             let schema_def = conn
                 .get_schema(rpc::schema_registry::VersionedId {
                     id: id.clone(),
-                    version_req: version.clone(),
+                    version_req: format!("={}", version),
                 })
                 .await
                 .map_err(rpc::error::registry_error)?
@@ -240,7 +238,6 @@ impl Schema {
 
             definitions.push(Definition {
                 version: schema_def.version,
-                queried_version: version,
                 definition: schema_def.definition,
             });
         }

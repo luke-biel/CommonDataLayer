@@ -30,8 +30,6 @@ pub struct Definition {
     pub definition: String,
     /// Schema is following semantic versioning, querying for "2.1.0" will return "2.1.1" if exist
     pub version: String,
-    /// Actual version for example "2.1.0"
-    pub queried_version: String,
 }
 
 /// An expression used to retrieve more complex queries
