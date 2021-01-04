@@ -189,8 +189,32 @@ impl Schema {
         self.schema_type
     }
 
+    /// Returns schema definition for given version.
+    /// Schema is following semantic versioning, querying for "2.1.0" will return "2.1.1" if exist
+    /// To see queried version ask for `queried_version` - it returns "2.1.0"`
+    async fn definition(&self, context: &Context, version: String) -> FieldResult<Definition> {
+        let id = self.id.to_string();
+        let mut conn = context.connect_to_registry().await?;
+        let schema_def = conn
+            .get_schema(rpc::schema_registry::VersionedId {
+                id,
+                version_req: version.clone(),
+            })
+            .await
+            .map_err(rpc::error::registry_error)?
+            .into_inner();
+
+        Ok(Definition {
+            version: schema_def.version,
+            queried_version: version,
+            definition: schema_def.definition,
+        })
+    }
+
     /// All definitions connected to this schema.
     /// Each schema can have only one active definition, under latest version but also contains history for backward compability.
+    /// Schema is following semantic versioning, querying for "2.1.0" will return "2.1.1" if exist
+    /// To see queried version ask for `queried_version` - it returns "2.1.0"`
     async fn definitions(&self, context: &Context) -> FieldResult<Vec<Definition>> {
         let mut conn = context.connect_to_registry().await?;
         let id = self.id.to_string();
