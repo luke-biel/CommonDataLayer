@@ -1,0 +1,124 @@
+@c1: #F2F2F2;
+@c2: #E6E6E6;
+@c3: #DCDCDA;
+@c4: #C4C4C4;
+@c5: #72C29B;
+@c6: #60AA85;
+@c7: #47834B;
+@c8: #A4A875;
+@c9: #222222;
+
+@main_body_color: @c1;
+@main_text_color: @c9;
+@menu_background_color: @c5;
+@table_background_color: @c3;
+@table_first_inner_column: @c7;
+@table_inner_column: @c7;
+@table_heading_column: @c6;
+@svg_button_color: @c9;
+@button_body: @c4;
+@button_border: @c7;
+@button_text: @c9;
+@menu_list_elem_border: @c8;
+@menu_list_elem_background: @c7;
+@menu_list_elem_text: @c2;
+@menu_list_elem_border_hover: @c8;
+@menu_list_elem_background_hover: @c6;
+@menu_link_border_thin: 0px;
+
+@border_thin: 1px;
+@border_thick: 2px;
+
+@font-face {
+  font-family: "Lucida Grande", Helvetica, Arial, sans-serif;
+  font-size: 3em;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  background-color: @main_body_color;
+  color: @main_text_color;
+  height: 100%;
+  display: flex;
+  padding: 0;
+  margin: 0;
+}
+
+div#menu-bar {
+  width: 200px;
+  flex-shrink: 0;
+  background-color: @menu_background_color;
+  padding: 0.5em;
+}
+
+div#content {
+  flex-grow: 1;
+  padding: 1em;
+}
+
+table.simple-summary {
+  background-color: @table_background_color;
+  border-radius: 1em;
+  padding: 0.5em;
+}
+
+td.simple-name-column {
+  font-weight: bold;
+}
+
+td.simple-name-column {
+  border-right: @border_thin dotted @table_first_inner_column;
+}
+
+td.simple-column {
+  border-bottom: @border_thin dotted @table_inner_column;
+  padding: 0.5em;
+}
+
+td.simple-summary-heading {
+  border-bottom: @border_thick solid @table_heading_column;
+  font-weight: bold;
+}
+
+path.small-svg-button {
+  fill: @svg_button_color;
+}
+
+button.small-action-button {
+  background-color: @button_body;
+  border: @border_thin solid @button_border;
+  color: @button_text;
+  border-radius: 3px;
+  padding: 4px;
+  margin: 0;
+  horiz-align: center;
+  vert-align: middle;
+}
+
+ul.menu-list {
+  list-style-type: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+li.menu-link {
+  border: @menu_link_border_thin solid @menu_list_elem_border;
+  background-color: @menu_list_elem_background;
+  padding: 0.2em;
+  margin: 0 0 0.5em;
+  border-radius: 1em;
+  text-align: center;
+}
+
+li.menu-link:hover {
+  border: @menu_link_border_thin solid @menu_list_elem_border_hover;
+  background-color: @menu_list_elem_background_hover;
+}
+
+li a.menu-link-text {
+  color: @menu_list_elem_text;
+}

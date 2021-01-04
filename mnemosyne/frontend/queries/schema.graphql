@@ -1,0 +1,186 @@
+schema {
+  query: Query
+  mutation: QueryMut
+}
+
+"""
+Schema definition stores information about data structure used to push object to database.
+Each schema can have only one active definition, under latest version but also contains history for backward compability.
+"""
+type Definition {
+  """
+  Definition is stored as a JSON value and therefore needs to be valid JSON.
+  """
+  definition: String!
+
+  """
+  Schema is following semantic versioning, querying for "2.1.0" will return "2.1.1" if exist
+  """
+  version: String!
+
+  """
+  Actual version for example "2.1.0"
+  """
+  queriedVersion: String!
+}
+
+"""
+Input object which creates new schema and new definition. Each schema has to
+contain at least one definition, which can be later overriden.
+"""
+input NewSchema {
+  """
+  The name is not required to be unique among all schemas (as `id` is the identifier)
+  """
+  name: String!
+
+  """Address of the query service responsible for retrieving data from DB"""
+  queryAddress: String!
+
+  """Kafka topic to which data is inserted by data-router."""
+  topic: String!
+
+  """
+  Definition is stored as a JSON value and therefore needs to be valid JSON.
+  """
+  definition: String!
+  type: SchemaType!
+}
+
+"""Input object which creates new version of existing schema."""
+input NewVersion {
+  """
+  Schema is following semantic versioning, querying for "2.1.0" will return "2.1.1" if exist
+  When updating, new version has to be higher than highest stored version in DB for given schema.
+  """
+  version: String!
+
+  """
+  Definition is stored as a JSON value and therefore needs to be valid JSON.
+  """
+  definition: String!
+}
+
+"""Input object which creates new view."""
+input NewView {
+  """
+  The name is not required to be unique among all views (as `id` is the identifier)
+  """
+  name: String!
+
+  """
+  Expression is in JMESPath format, although right now there is no validation
+  """
+  expression: String!
+}
+
+type Query {
+  """Return single schema for given id"""
+  schema(id: Uuid!): Schema!
+
+  """Return all schemas in database"""
+  schemas: [Schema!]!
+
+  """Return single view for given id"""
+  view(id: Uuid!): View!
+}
+
+type QueryMut {
+  addSchema(new: NewSchema!): Schema!
+  addSchemaDefinition(schemaId: Uuid!, newVersion: NewVersion!): Definition!
+  addView(schemaId: Uuid!, newView: NewView!): View!
+  updateView(id: Uuid!, update: UpdateView!): View!
+  updateSchema(id: Uuid!, update: UpdateSchema!): Schema!
+}
+
+"""
+Schema is the format in which data is to be sent to the Common Data Layer.
+"""
+type Schema {
+  """Random UUID assigned on creation"""
+  id: Uuid!
+
+  """
+  The name is not required to be unique among all schemas (as `id` is the identifier)
+  """
+  name: String!
+
+  """Kafka topic to which data is inserted by data-router."""
+  topic: String!
+
+  """Address of the query service responsible for retrieving data from DB"""
+  queryAddress: String!
+  type: SchemaType!
+
+  """
+  All definitions connected to this schema.
+  Each schema can have only one active definition, under latest version but also contains history for backward compability.
+  """
+  definitions: [Definition!]!
+
+  """All views connected to this schema"""
+  views: [View!]!
+}
+
+"""
+Schema type, describes what kind of query service and command service is going
+to be used, as timeseries databases are quite different than others.
+"""
+enum SchemaType {
+  DOCUMENT_STORAGE
+  TIMESERIES
+}
+
+"""
+Input object which updates fields in schema. All fields are optional, therefore
+one may update only `topic` or `queryAddress` or all of them.
+"""
+input UpdateSchema {
+  """
+  The name is not required to be unique among all schemas (as `id` is the identifier)
+  """
+  name: String
+
+  """Address of the query service responsible for retrieving data from DB"""
+  queryAddress: String
+
+  """Kafka topic to which data is inserted by data-router."""
+  topic: String
+  type: SchemaType
+}
+
+"""
+Input object which updates fields in view. All fields are optional, therefore
+one may update only `name` or `expression` or all of them.
+"""
+input UpdateView {
+  """
+  The name is not required to be unique among all views (as `id` is the identifier)
+  """
+  name: String
+
+  """
+  Expression is in JMESPath format, although right now there is no validation
+  """
+  expression: String
+}
+
+"""Uuid"""
+scalar Uuid
+
+"""An expression used to retrieve more complex queries"""
+type View {
+  """Unique identifier of view"""
+  id: Uuid!
+
+  """
+  The name is not required to be unique among all views (as `id` is the identifier)
+  """
+  name: String!
+
+  """
+  Expression is in JMESPath format, although right now there is no validation
+  """
+  expression: String!
+}
+

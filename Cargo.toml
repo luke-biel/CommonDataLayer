@@ -1,19 +1,23 @@
 [workspace]
 members = [
-    "api",
-    "blob-store",
-    "benchmarking",
-    "cdl-cli",
-    "command-service",
-    "data-router",
-    "document-storage",
-    "db-shrinker-postgres",
-    "leader-elector",
-    "query-router",
-    "query-service",
-    "query-service-ts",
-    "rpc",
-    "schema-registry",
+  "api",
+  "blob-store",
+  "benchmarking",
+  "cdl-cli",
+  "command-service",
+  "data-router",
+  "document-storage",
+  "db-shrinker-postgres",
+  "leader-elector",
+  "query-router",
+  "query-service",
+  "query-service-ts",
+  "rpc",
+  "schema-registry",
+]
+exclude = [
+  "mnemosyne",
+  "mnemosyne/frontend"
 ]
 
 [profile.release]

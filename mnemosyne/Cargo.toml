@@ -1,0 +1,21 @@
+[package]
+name = "mnemosyne"
+version = "0.1.0"
+authors = ["Łukasz Biel <lukasz.p.biel@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+path = "src/main.rs"
+name = "mnemosyne-server"
+
+[lib]
+path = "src/lib.rs"
+name = "mnemosyne"
+
+[dependencies]
+warp = "0.2.5"
+tokio = { version = "0.2", features = ["macros", "rt-threaded"]}
+anyhow = "1.0.37"
+handlebars = "3.5.2"
+serde_json = "1.0.61"

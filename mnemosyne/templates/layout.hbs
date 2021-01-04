@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <!-- TODO: This is only for development purposes, should be changed to pre-generated CSS -->
+    <link rel="stylesheet/less" type="text/css" href="/static/css/main.less" />
+    <script src="//cdn.jsdelivr.net/npm/less" ></script>
+    <!-- -->
+    <script type="module">
+        import init, * as m from "/static/wasm/wasm.js"
+        init()
+        window.m = m
+    </script>
+    <title>Mnemosyne - CDL admin panel</title>
+</head>
+<body>
+    <div id="content"></div>
+</body>
+</html>

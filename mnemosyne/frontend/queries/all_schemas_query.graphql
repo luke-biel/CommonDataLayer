@@ -1,0 +1,6 @@
+query AllSchemasQuery {
+    schemas {
+        id
+        name
+    }
+}

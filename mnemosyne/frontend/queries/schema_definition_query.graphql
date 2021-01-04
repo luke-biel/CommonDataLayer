@@ -1,0 +1,9 @@
+query SchemaDefinitionQuery($id: Uuid!) {
+    schema(id:$id) {
+        id,
+        definitions {
+            version,
+            definition,
+        }
+    }
+}
