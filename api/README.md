@@ -31,7 +31,7 @@ This crate is under heavy work-in-progress. It may change a lot with breaking ch
 # Getting started
 
 You can deploy web api on local computer via `docker-compose`.
-For more see [documentation](deployment/compose/README.md).
+For more see [documentation](../deployment/compose/README.md).
 
 You can access interactive graphQL editor at http://localhost:50106/graphiql. It supports auto-completion, has built-in documentation explorer and history. 
 
