@@ -2,6 +2,7 @@ use crate::graphql::{all_schemas_query, AllSchemasQuery};
 use graphql_client::GraphQLQuery;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use std::rc::Rc;
 use uuid::Uuid;
 use yew::Properties;
 
@@ -12,7 +13,7 @@ struct CDLSchemasData {
 
 #[derive(Clone, Debug, Deserialize, Serialize, Properties, PartialEq)]
 pub struct CDLSchemas {
-    pub schemas: Vec<CDLSchemaView>,
+    pub schemas: Vec<Rc<CDLSchemaView>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
