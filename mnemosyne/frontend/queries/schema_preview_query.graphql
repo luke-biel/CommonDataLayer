@@ -1,0 +1,13 @@
+query SchemaPreviewQuery($id: Uuid!) {
+    schema(id: $id) {
+        id,
+        name,
+        queryAddress,
+        topic,
+        type,
+        definition(version: "*") {
+            version,
+            definition
+        }
+    }
+}

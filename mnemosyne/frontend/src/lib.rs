@@ -1,11 +1,12 @@
 #![recursion_limit = "1024"]
 
 mod cdl_objects;
-mod graphql;
+mod event_bus;
 mod schema_registry;
 
-use crate::cdl_objects::CDLSchemas;
+use crate::cdl_objects::schema_preview::CDLSchema;
 use crate::schema_registry::{SchemaRegistry, SchemaRegistryProps};
+use cdl_objects::all_schemas::CDLSchemas;
 use reqwest::Url;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
@@ -16,23 +17,25 @@ use yewtil::future::LinkFuture;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-enum SubPage {
+pub enum SubPage {
     Fetching,
     Error(String),
     SchemaRegistry(Rc<CDLSchemas>),
+    SchemaView(Rc<CDLSchema>),
 }
 
-struct Model {
+pub struct Model {
     link: ComponentLink<Self>,
     page: SubPage,
 }
 
-enum Msg {
+pub enum Msg {
     SetFetchState(FetchState),
 }
 
-enum FetchState {
+pub enum FetchState {
     Schemas(CDLSchemas),
+    Schema(CDLSchema),
     Failed(String),
 }
 
@@ -58,6 +61,7 @@ impl Component for Model {
         match msg {
             Msg::SetFetchState(fetch_state) => match fetch_state {
                 FetchState::Schemas(items) => self.page = SubPage::SchemaRegistry(Rc::new(items)),
+                FetchState::Schema(schema) => self.page = SubPage::SchemaView(Rc::new(schema)),
                 FetchState::Failed(error) => self.page = SubPage::Error(error),
             },
         }
@@ -73,13 +77,16 @@ impl Component for Model {
     fn view(&self) -> Html {
         match &self.page {
             SubPage::Fetching => html! { "Fetching" },
+            SubPage::Error(err) => html! { <h1>{{err}}</h1> },
             SubPage::SchemaRegistry(schemas) => {
                 let schemas = schemas.clone();
                 html! {
-                    <SchemaRegistry items=schemas />
+                    <SchemaRegistry items=schemas model=self.link.clone() />
                 }
             }
-            SubPage::Error(err) => html! { <h1>{{err}}</h1> },
+            SubPage::SchemaView(schema) => html! {
+                { format!("{:?}", schema) }
+            },
         }
     }
 }

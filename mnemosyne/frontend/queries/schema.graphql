@@ -17,11 +17,6 @@ type Definition {
   Schema is following semantic versioning, querying for "2.1.0" will return "2.1.1" if exist
   """
   version: String!
-
-  """
-  Actual version for example "2.1.0"
-  """
-  queriedVersion: String!
 }
 
 """
@@ -113,8 +108,17 @@ type Schema {
   type: SchemaType!
 
   """
+  Returns schema definition for given version.
+  Schema is following semantic versioning, querying for "2.1.0" will return "2.1.1" if exist
+  To see queried version ask for `queried_version` - it returns "2.1.0"`
+  """
+  definition(version: String!): Definition!
+
+  """
   All definitions connected to this schema.
   Each schema can have only one active definition, under latest version but also contains history for backward compability.
+  Schema is following semantic versioning, querying for "2.1.0" will return "2.1.1" if exist
+  To see queried version ask for `queried_version` - it returns "2.1.0"`
   """
   definitions: [Definition!]!
 
