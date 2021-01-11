@@ -20,8 +20,6 @@ impl Component for Menu {
     type Properties = ();
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-        log::info!("create");
-
         Self {
             link,
             dispatcher: ContextBus::dispatcher(),
@@ -29,7 +27,6 @@ impl Component for Menu {
     }
 
     fn update(&mut self, msg: Self::Message) -> bool {
-        log::info!("{:?}", msg);
         match msg {
             Msg::SchemaRegistry => self
                 .dispatcher

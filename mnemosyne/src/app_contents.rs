@@ -52,8 +52,8 @@ impl Component for AppContents {
         html! {
             {
                 match self.page {
-                    Page::Index => html! { <IndexComponent /> },
-                    Page::SchemaRegistry => html! { <SchemaRegistryComponent /> },
+                    Page::Index => html! { <Index /> },
+                    Page::SchemaRegistry => html! { <SchemaRegistry /> },
                 }
             }
         }

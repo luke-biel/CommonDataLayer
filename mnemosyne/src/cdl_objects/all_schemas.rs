@@ -20,7 +20,7 @@ struct CDLSchemasData {
 
 #[derive(Clone, Debug, Deserialize, Serialize, Properties, PartialEq)]
 pub struct CDLSchemas {
-    pub schemas: Vec<Arc<CDLSchemaView>>,
+    pub schemas: Vec<CDLSchemaView>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]

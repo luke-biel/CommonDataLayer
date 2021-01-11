@@ -1,16 +1,26 @@
 use uuid::Uuid;
 use yew::prelude::*;
+use crate::components::*;
 
-pub struct IndexComponent {
+pub struct SchemaRegistry {
     link: ComponentLink<Self>,
+    page: Page,
 }
 
-impl Component for IndexComponent {
+pub enum Page {
+    List,
+    View(Uuid),
+}
+
+impl Component for SchemaRegistry {
     type Message = ();
     type Properties = ();
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self { link }
+        Self {
+            link,
+            page: Page::List,
+        }
     }
 
     fn update(&mut self, msg: Self::Message) -> bool {
@@ -22,6 +32,9 @@ impl Component for IndexComponent {
     }
 
     fn view(&self) -> Html {
-        html! { {"xxx"} }
+        match self.page {
+            Page::List => html! { <SchemaRegistryList /> },
+            Page::View(id) => html! {  }
+        }
     }
 }

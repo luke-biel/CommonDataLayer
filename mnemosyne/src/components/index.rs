@@ -1,25 +1,16 @@
 use uuid::Uuid;
 use yew::prelude::*;
 
-pub struct SchemaRegistryComponent {
+pub struct Index {
     link: ComponentLink<Self>,
-    page: Page,
 }
 
-pub enum Page {
-    List,
-    View(Uuid),
-}
-
-impl Component for SchemaRegistryComponent {
+impl Component for Index {
     type Message = ();
     type Properties = ();
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self {
-            link,
-            page: Page::List,
-        }
+        Self { link }
     }
 
     fn update(&mut self, msg: Self::Message) -> bool {
@@ -31,6 +22,6 @@ impl Component for SchemaRegistryComponent {
     }
 
     fn view(&self) -> Html {
-        html! { {"don goofed"} }
+        html! { {"xxx"} }
     }
 }
