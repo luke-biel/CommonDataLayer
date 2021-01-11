@@ -1,7 +1,6 @@
 use graphql_client::GraphQLQuery;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
 use uuid::Uuid;
 use yew::Properties;
 

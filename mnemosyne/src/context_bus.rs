@@ -1,22 +1,23 @@
+use crate::app_contents::Page;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use yew::worker::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Request {
-    EventBusMsg(String),
+    Open(Page),
 }
 
-pub struct EventBus {
-    link: AgentLink<EventBus>,
+pub struct ContextBus {
+    link: AgentLink<ContextBus>,
     subscribers: HashSet<HandlerId>,
 }
 
-impl Agent for EventBus {
+impl Agent for ContextBus {
     type Reach = Context<Self>;
     type Message = ();
     type Input = Request;
-    type Output = String;
+    type Output = Page;
 
     fn create(link: AgentLink<Self>) -> Self {
         Self {
@@ -33,9 +34,9 @@ impl Agent for EventBus {
 
     fn handle_input(&mut self, msg: Self::Input, _id: HandlerId) {
         match msg {
-            Request::EventBusMsg(s) => {
-                for sub in self.subscribers.iter() {
-                    self.link.respond(*sub, s.clone());
+            Request::Open(page) => {
+                for sub in self.subscribers.iter().copied() {
+                    self.link.respond(sub, page);
                 }
             }
         }
