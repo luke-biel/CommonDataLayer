@@ -2,27 +2,30 @@ use crate::app_contents::Page;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use yew::worker::*;
+use std::marker::PhantomData;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum Request {
-    Open(Page),
+pub enum Request<T: Clone + 'static> {
+    Open(T),
 }
 
-pub struct ContextBus {
-    link: AgentLink<ContextBus>,
+pub struct ContextBus<T: Clone + 'static> {
+    link: AgentLink<ContextBus<T>>,
     subscribers: HashSet<HandlerId>,
+    _phantom: PhantomData<T>,
 }
 
-impl Agent for ContextBus {
+impl<T: Clone + 'static> Agent for ContextBus<T> {
     type Reach = Context<Self>;
     type Message = ();
-    type Input = Request;
-    type Output = Page;
+    type Input = Request<T>;
+    type Output = T;
 
     fn create(link: AgentLink<Self>) -> Self {
         Self {
             link,
             subscribers: HashSet::new(),
+            _phantom: PhantomData,
         }
     }
 
@@ -36,7 +39,7 @@ impl Agent for ContextBus {
         match msg {
             Request::Open(page) => {
                 for sub in self.subscribers.iter().copied() {
-                    self.link.respond(sub, page);
+                    self.link.respond(sub, page.clone());
                 }
             }
         }

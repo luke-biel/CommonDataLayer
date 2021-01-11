@@ -6,7 +6,7 @@ use serde::{Serialize, Deserialize};
 pub struct AppContents {
     link: ComponentLink<Self>,
     page: Page,
-    _context_bus: Box<dyn Bridge<ContextBus>>,
+    _context_bus: Box<dyn Bridge<ContextBus<Page>>>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -25,7 +25,7 @@ impl Component for AppContents {
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         let callback = link.callback(Msg::RequestPage);
-        let context_bus = ContextBus::bridge(callback);
+        let context_bus = ContextBus::<Page>::bridge(callback);
 
         Self {
             link,
@@ -45,7 +45,7 @@ impl Component for AppContents {
     }
 
     fn change(&mut self, _props: Self::Properties) -> bool {
-        false
+        true
     }
 
     fn view(&self) -> Html {

@@ -1,9 +1,14 @@
 use crate::cdl_objects::all_schemas::CDLSchemaView;
 use yew::prelude::*;
 use std::sync::Arc;
+use yew::agent::Dispatcher;
+use crate::context_bus::{ContextBus, Request};
+use crate::components::schema_registry::Page;
 
 pub struct RowView {
     props: Props,
+    link: ComponentLink<Self>,
+    dispatcher: Dispatcher<ContextBus<Page>>
 }
 
 #[derive(Clone, Debug, Properties)]
@@ -11,17 +16,27 @@ pub struct Props {
     pub schema: CDLSchemaView,
 }
 
+pub enum Msg {
+    OpenView,
+}
+
 impl Component for RowView {
-    type Message = ();
+    type Message = Msg;
     type Properties = Props;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
         Self {
             props,
+            link,
+            dispatcher: ContextBus::<Page>::dispatcher(),
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> bool {
+        match msg {
+            Msg::OpenView => self.dispatcher.send(Request::Open(Page::View(self.props.schema.id))),
+        }
+
         false
     }
 
@@ -30,12 +45,14 @@ impl Component for RowView {
     }
 
     fn view(&self) -> Html {
+        let on_view = self.link.callback(|_| Msg::OpenView);
+
         html! {
             <tr>
                 <td class="simple-name-column simple-column">{ self.props.schema.name.as_str() }</td>
                 <td class="simple-column">{ self.props.schema.id }</td>
                 <td class="simple-column">
-                    <button type="button" title="View schema" class="small-action-button">
+                    <button type="button" title="View schema" class="small-action-button" onclick=on_view>
                         <svg width="1.2em" height="1.2em" viewBox="0 0 10 10">
                             <path class="small-svg-button"
                                 d="M588.6,747.293l-3.115-3.141A3.455,3.455,0,1,0,582.438,746a3.4,3.4,0,0,0,1.639-.434l3.116,3.141a0.985,0.985,0,0,0,1.4,0A1,1,0,0,0,588.6,747.293Zm-7.644-4.793a1.488,1.488,0,1,1,1.487,1.5A1.494,1.494,0,0,1,580.951,742.5Z"
