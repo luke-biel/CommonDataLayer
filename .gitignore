@@ -1,6 +1,6 @@
 registry_db/
 storage_db/
-target/
+**/target/
 venv
 __pycache__
 .pytest_cache

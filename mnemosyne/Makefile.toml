@@ -2,12 +2,17 @@
 script = "wasm-pack build . --target web --out-name wasm --out-dir www/wasm"
 
 [tasks.clean-wasm]
-script = "rm -rf static/wasm"
+script = "rm -rf www/wasm"
 
 [tasks.build]
-dependencies = ["clean-wasm", "pack-wasm"]
+dependencies = ["pack-wasm"]
 command = "cargo"
 args = ["build"]
+
+[tasks.rebuild]
+dependencies = ["clean-wasm", "pack-wasm"]
+command = "cargo"
+args = "build"
 
 [tasks.start]
 dependencies = ["build"]
