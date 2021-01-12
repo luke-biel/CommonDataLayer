@@ -1,0 +1,5 @@
+mutation AddDefinitionMut($id: Uuid!, $version: String!, $definition: String!) {
+    addSchemaDefinition(schemaId: $id, newVersion: {version: $version, definition: $definition}) {
+        definition
+    }
+}

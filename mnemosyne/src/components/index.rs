@@ -19,6 +19,6 @@ impl Component for Index {
     }
 
     fn view(&self) -> Html {
-        html! { {"xxx"} }
+        html! { {"(WIP) Pick option from menu"} }
     }
 }

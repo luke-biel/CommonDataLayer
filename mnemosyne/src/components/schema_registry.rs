@@ -48,7 +48,8 @@ impl Component for SchemaRegistry {
     }
 
     fn change(&mut self, _props: Self::Properties) -> bool {
-        false
+        self.page = Page::List;
+        true
     }
 
     fn view(&self) -> Html {

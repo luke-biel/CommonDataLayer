@@ -7,7 +7,7 @@ pub mod schema_registry_view;
 
 pub use index::Index;
 pub use schema_registry::SchemaRegistry;
+pub use schema_registry_add_definition::SchemaRegistryAddDefinition;
 pub use schema_registry_edit::SchemaRegistryEdit;
 pub use schema_registry_list::SchemaRegistryList;
 pub use schema_registry_view::SchemaRegistryView;
-pub use schema_registry_add_definition::SchemaRegistryAddDefinition;
