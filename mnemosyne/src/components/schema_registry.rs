@@ -4,8 +4,7 @@ use crate::components::*;
 use crate::context_bus::ContextBus;
 
 pub struct SchemaRegistry {
-    link: ComponentLink<Self>,
-    page: Page,
+    page: Page, // TODO: Make it a stack
     _context_bus: Box<dyn Bridge<ContextBus<Page>>>,
 }
 
@@ -13,6 +12,7 @@ pub struct SchemaRegistry {
 pub enum Page {
     List,
     View(Uuid),
+    Edit(Uuid),
 }
 
 pub enum Msg {
@@ -28,7 +28,6 @@ impl Component for SchemaRegistry {
         let context_bus = ContextBus::<Page>::bridge(callback);
 
         Self {
-            link,
             page: Page::List,
             _context_bus: context_bus,
         }
@@ -54,7 +53,8 @@ impl Component for SchemaRegistry {
     fn view(&self) -> Html {
         match self.page {
             Page::List => html! { <SchemaRegistryList /> },
-            Page::View(id) => html! { <SchemaRegistryView id=id /> }
+            Page::View(id) => html! { <SchemaRegistryView id=id /> },
+            Page::Edit(id) => html! { <SchemaRegistryEdit id=id /> },
         }
     }
 }

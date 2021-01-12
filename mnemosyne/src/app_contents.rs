@@ -4,7 +4,6 @@ use yew::prelude::*;
 use serde::{Serialize, Deserialize};
 
 pub struct AppContents {
-    link: ComponentLink<Self>,
     page: Page,
     _context_bus: Box<dyn Bridge<ContextBus<Page>>>,
 }
@@ -28,7 +27,6 @@ impl Component for AppContents {
         let context_bus = ContextBus::<Page>::bridge(callback);
 
         Self {
-            link,
             page: Page::Index,
             _context_bus: context_bus,
         }

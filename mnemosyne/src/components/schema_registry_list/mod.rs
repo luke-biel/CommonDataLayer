@@ -1,8 +1,6 @@
-use uuid::Uuid;
 use yew::prelude::*;
 use crate::cdl_objects::all_schemas::CDLSchemas;
 use yewtil::future::LinkFuture;
-use wasm_bindgen::__rt::std::future::Future;
 use crate::GRAPHQL_URL;
 
 mod row_view;
@@ -10,7 +8,6 @@ mod row_view;
 use row_view::RowView;
 
 pub struct SchemaRegistryList {
-    link: ComponentLink<Self>,
     state: State,
 }
 
@@ -38,7 +35,6 @@ impl Component for SchemaRegistryList {
         });
 
         Self {
-            link,
             state: State::Fetching,
         }
     }

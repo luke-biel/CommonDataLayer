@@ -6,7 +6,6 @@ use crate::GRAPHQL_URL;
 
 pub struct SchemaRegistryView {
     props: Props,
-    link: ComponentLink<Self>,
     state: State,
 }
 
@@ -41,7 +40,6 @@ impl Component for SchemaRegistryView {
 
         Self {
             props,
-            link,
             state: State::Fetching,
         }
     }
@@ -66,12 +64,18 @@ impl Component for SchemaRegistryView {
                 <>
                 <h1>{ schema.name.as_str() }</h1>
                 <h2>{ schema.id }</h2>
-                <h2>{ "topic: " }{ schema.topic.as_str() }{ ", query_address: " }{ schema.query_address.as_str() }</h2>
+                <h2>{ "topic: " }{ schema.topic.as_str() }</h2>
+                <h2>{ "query_address: " }{ schema.query_address.as_str() }</h2>
+                <h2>{ "type: " }{ schema.repository_type.as_str() }</h2>
+                <h3>{ "version: " }{ schema.definition.version.as_str() }</h3>
+                <pre>
+                    <code>
+                        { schema.definition.body.as_str() }
+                    </code>
+                </pre>
                 </>
             },
             State::Error(ref error) => html! { <h1>{ error }</h1> },
         }
-
-
     }
 }

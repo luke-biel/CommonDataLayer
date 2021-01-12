@@ -38,7 +38,7 @@ pub struct CDLSchema {
 pub struct CDLSchemaDefinition {
     pub version: String,
     #[serde(rename = "definition")]
-    pub schema: String,
+    pub body: String,
 }
 
 impl CDLSchema {

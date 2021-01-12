@@ -1,6 +1,5 @@
 use crate::cdl_objects::all_schemas::CDLSchemaView;
 use yew::prelude::*;
-use std::sync::Arc;
 use yew::agent::Dispatcher;
 use crate::context_bus::{ContextBus, Request};
 use crate::components::schema_registry::Page;
@@ -18,6 +17,7 @@ pub struct Props {
 
 pub enum Msg {
     OpenView,
+    OpenEdit,
 }
 
 impl Component for RowView {
@@ -33,9 +33,12 @@ impl Component for RowView {
     }
 
     fn update(&mut self, msg: Self::Message) -> bool {
-        match msg {
-            Msg::OpenView => self.dispatcher.send(Request::Open(Page::View(self.props.schema.id))),
-        }
+        let page = match msg {
+            Msg::OpenView => Page::View(self.props.schema.id),
+            Msg::OpenEdit => Page::Edit(self.props.schema.id),
+        };
+
+        self.dispatcher.send(Request::Open(page));
 
         false
     }
@@ -46,6 +49,7 @@ impl Component for RowView {
 
     fn view(&self) -> Html {
         let on_view = self.link.callback(|_| Msg::OpenView);
+        let on_edit = self.link.callback(|_| Msg::OpenEdit);
 
         html! {
             <tr>
@@ -59,7 +63,7 @@ impl Component for RowView {
                                 transform="translate(-578.969 -739)"/>
                         </svg>
                     </button>
-                    <button type="button" title="Edit schema" class="small-action-button">
+                    <button type="button" title="Edit schema" class="small-action-button" onclick=on_edit>
                         <svg width="1.2em" height="1.2em" viewBox="0 0 16 16">
                         <path class="small-svg-button"
                               d="M78.993,432H65.007a1,1,0,0,1-1-1V417a1,1,0,0,1,1-1H71a1,1,0,0,1,0,2h-5v12H77.994v-5a1,1,0,1,1,2,0v6A1,1,0,0,1,78.993,432Zm-2-14,1,1L71,426H70v-1l6.993-7h0Zm0-2a1.989,1.989,0,0,0-1.413.586l-6.993,7A2,2,0,0,0,68,425v1a2,2,0,0,0,2,2h1a2,2,0,0,0,1.413-.586l6.993-7a2,2,0,0,0,0-2.828l-1-1A1.989,1.989,0,0,0,76.995,416h0Z"

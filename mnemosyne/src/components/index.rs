@@ -1,19 +1,16 @@
-use uuid::Uuid;
 use yew::prelude::*;
 
-pub struct Index {
-    link: ComponentLink<Self>,
-}
+pub struct Index;
 
 impl Component for Index {
     type Message = ();
     type Properties = ();
 
-    fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self { link }
+    fn create(_: Self::Properties, _: ComponentLink<Self>) -> Self {
+        Self
     }
 
-    fn update(&mut self, msg: Self::Message) -> bool {
+    fn update(&mut self, _: Self::Message) -> bool {
         false
     }
 

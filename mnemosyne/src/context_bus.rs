@@ -1,4 +1,3 @@
-use crate::app_contents::Page;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use yew::worker::*;

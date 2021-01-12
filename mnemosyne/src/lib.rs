@@ -5,11 +5,9 @@ use log::Level;
 use reqwest::Url;
 use wasm_bindgen::prelude::*;
 use yew::utils::document;
-use yew::{html, App, Component, ComponentLink, Html, Threaded};
-use yew_router::prelude::*;
+use yew::{html, App, Component, ComponentLink, Html};
 
 use crate::app_contents::AppContents;
-use crate::context_bus::ContextBus;
 use crate::menu::Menu;
 
 mod app_contents;
@@ -25,16 +23,14 @@ lazy_static! {
     pub static ref GRAPHQL_URL: Url = Url::parse("http://localhost:50106/graphql").unwrap();
 }
 
-pub struct Model {
-    link: ComponentLink<Self>,
-}
+pub struct Model;
 
 impl Component for Model {
     type Message = ();
     type Properties = ();
 
-    fn create(_props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Model { link }
+    fn create(_props: Self::Properties, _: ComponentLink<Self>) -> Self {
+        Self
     }
 
     fn update(&mut self, _: Self::Message) -> bool {

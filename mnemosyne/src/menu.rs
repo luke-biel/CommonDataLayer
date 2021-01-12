@@ -3,7 +3,6 @@ use crate::context_bus;
 use crate::context_bus::ContextBus;
 use yew::agent::Dispatcher;
 use yew::prelude::*;
-use yew_router::prelude::*;
 
 pub struct Menu {
     link: ComponentLink<Self>,
