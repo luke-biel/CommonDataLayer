@@ -30,7 +30,10 @@ pub struct CDLUpdateQueryAddress {
 
 impl CDLUpdateQueryAddress {
     pub async fn fetch(endpoint: Url, id: Uuid, query_address: String) -> Result<String, String> {
-        let query = UpdateQueryAddressMut::build_query(update_query_address_mut::Variables { id, query_address });
+        let query = UpdateQueryAddressMut::build_query(update_query_address_mut::Variables {
+            id,
+            query_address,
+        });
 
         let response: CDLResponse = reqwest::Client::new()
             .post(endpoint)

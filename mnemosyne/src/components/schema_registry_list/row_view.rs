@@ -18,6 +18,7 @@ pub struct Props {
 pub enum Msg {
     OpenView,
     OpenEdit,
+    OpenAdd,
 }
 
 impl Component for RowView {
@@ -36,6 +37,7 @@ impl Component for RowView {
         let page = match msg {
             Msg::OpenView => Page::View(self.props.schema.id),
             Msg::OpenEdit => Page::Edit(self.props.schema.id),
+            Msg::OpenAdd => Page::AddDefinition(self.props.schema.id),
         };
 
         self.dispatcher.send(Request::Open(page));
@@ -50,6 +52,7 @@ impl Component for RowView {
     fn view(&self) -> Html {
         let on_view = self.link.callback(|_| Msg::OpenView);
         let on_edit = self.link.callback(|_| Msg::OpenEdit);
+        let on_add = self.link.callback(|_| Msg::OpenAdd);
 
         html! {
             <tr>
@@ -68,6 +71,13 @@ impl Component for RowView {
                         <path class="small-svg-button"
                               d="M78.993,432H65.007a1,1,0,0,1-1-1V417a1,1,0,0,1,1-1H71a1,1,0,0,1,0,2h-5v12H77.994v-5a1,1,0,1,1,2,0v6A1,1,0,0,1,78.993,432Zm-2-14,1,1L71,426H70v-1l6.993-7h0Zm0-2a1.989,1.989,0,0,0-1.413.586l-6.993,7A2,2,0,0,0,68,425v1a2,2,0,0,0,2,2h1a2,2,0,0,0,1.413-.586l6.993-7a2,2,0,0,0,0-2.828l-1-1A1.989,1.989,0,0,0,76.995,416h0Z"
                               transform="translate(-64 -416)"/>
+                        </svg>
+                    </button>
+                    <button type="button" title="Add schema" class="small-action-button" onclick=on_add>
+                        <svg width="1.2em" height="1.2em" viewBox="0 0 16 16">
+                        <path class="small-svg-button"
+                              d="M551,713v6a1,1,0,0,0,2,0v-6h6a1,1,0,0,0,0-2h-6v-6a1,1,0,0,0-2,0v6h-6a1,1,0,0,0,0,2h6Z"
+                              transform="translate(-544 -704)"/>
                         </svg>
                     </button>
                 </td>

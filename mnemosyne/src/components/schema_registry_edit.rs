@@ -1,11 +1,11 @@
 use crate::cdl_objects::schema_preview::CDLSchema;
+use crate::cdl_objects::update_query_address::CDLUpdateQueryAddress;
 use crate::cdl_objects::update_topic::CDLUpdateTopic;
 use crate::GRAPHQL_URL;
 use std::fmt;
 use uuid::Uuid;
 use yew::prelude::*;
 use yewtil::future::LinkFuture;
-use crate::cdl_objects::update_query_address::CDLUpdateQueryAddress;
 
 #[derive(Clone, Debug)]
 pub struct SchemaRegistryEdit {
@@ -106,8 +106,11 @@ impl Component for SchemaRegistryEdit {
                 let id = self.props.id;
                 let query_address = self.query_address_form.clone();
                 self.link.send_future(async move {
-                    match CDLUpdateQueryAddress::fetch(GRAPHQL_URL.clone(), id, query_address).await {
-                        Ok(query_address) => Msg::QueryAddressUpdated(EditState::Edited(query_address)),
+                    match CDLUpdateQueryAddress::fetch(GRAPHQL_URL.clone(), id, query_address).await
+                    {
+                        Ok(query_address) => {
+                            Msg::QueryAddressUpdated(EditState::Edited(query_address))
+                        }
                         Err(err) => Msg::QueryAddressUpdated(EditState::Errored(err)),
                     }
                 })
@@ -124,7 +127,11 @@ impl Component for SchemaRegistryEdit {
                 }
             }
             Msg::QueryAddressUpdated(change) => {
-                if let State::Edit { ref mut query_address, .. } = self.state {
+                if let State::Edit {
+                    ref mut query_address,
+                    ..
+                } = self.state
+                {
                     *query_address = change;
                 } else {
                     log::error!(
@@ -133,8 +140,6 @@ impl Component for SchemaRegistryEdit {
                 }
             }
         }
-
-        log::info!("{:?}", self);
 
         true
     }
