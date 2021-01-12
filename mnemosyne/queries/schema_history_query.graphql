@@ -1,0 +1,8 @@
+query SchemaHistoryQuery($id: Uuid!) {
+    schema(id: $id) {
+        definitions {
+            version,
+            definition
+        }
+    }
+}

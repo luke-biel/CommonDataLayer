@@ -27,7 +27,7 @@ pub struct CDLAddDefinition {
     definition: String,
 }
 
-impl CDLAddDefinition {
+impl AddDefinitionMut {
     pub async fn fetch(
         endpoint: Url,
         id: Uuid,

@@ -1,4 +1,4 @@
-use crate::cdl_objects::add_definition::CDLAddDefinition;
+use crate::cdl_objects::add_definition::{AddDefinitionMut, CDLAddDefinition};
 use crate::GRAPHQL_URL;
 use uuid::Uuid;
 use yew::prelude::*;
@@ -47,7 +47,7 @@ impl Component for SchemaRegistryAddDefinition {
                 let version = self.version.clone();
                 let definition = self.definition.clone();
                 self.link.send_future(async move {
-                    match CDLAddDefinition::fetch(GRAPHQL_URL.clone(), id, version, definition)
+                    match AddDefinitionMut::fetch(GRAPHQL_URL.clone(), id, version, definition)
                         .await
                     {
                         Ok(definition) => Msg::SchemaAdded(definition),

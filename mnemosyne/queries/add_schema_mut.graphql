@@ -1,0 +1,5 @@
+mutation AddSchemaMut($name: String!, $queryAddress: String!, $topic: String!, $definition: String!, $typ: SchemaType!) {
+    addSchema(new: {name: $name, queryAddress: $queryAddress, topic: $topic, definition: $definition, type: $typ}) {
+        id
+    }
+}

@@ -1,6 +1,6 @@
-use crate::cdl_objects::schema_preview::CDLSchema;
-use crate::cdl_objects::update_query_address::CDLUpdateQueryAddress;
-use crate::cdl_objects::update_topic::CDLUpdateTopic;
+use crate::cdl_objects::schema_preview::{CDLSchema, SchemaPreviewQuery};
+use crate::cdl_objects::update_query_address::{CDLUpdateQueryAddress, UpdateQueryAddressMut};
+use crate::cdl_objects::update_topic::{CDLUpdateTopic, UpdateTopicMut};
 use crate::GRAPHQL_URL;
 use std::fmt;
 use uuid::Uuid;
@@ -67,7 +67,7 @@ impl Component for SchemaRegistryEdit {
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
         let id = props.id;
         link.send_future(async move {
-            match CDLSchema::fetch(GRAPHQL_URL.clone(), id).await {
+            match SchemaPreviewQuery::fetch(GRAPHQL_URL.clone(), id).await {
                 Ok(schemas) => Msg::SuccessfulFetch(schemas),
                 Err(error) => Msg::Error(error),
             }
@@ -96,7 +96,7 @@ impl Component for SchemaRegistryEdit {
                 let id = self.props.id;
                 let topic = self.topic_form.clone();
                 self.link.send_future(async move {
-                    match CDLUpdateTopic::fetch(GRAPHQL_URL.clone(), id, topic).await {
+                    match UpdateTopicMut::fetch(GRAPHQL_URL.clone(), id, topic).await {
                         Ok(topic) => Msg::TopicUpdated(EditState::Edited(topic)),
                         Err(err) => Msg::TopicUpdated(EditState::Errored(err)),
                     }
@@ -106,7 +106,7 @@ impl Component for SchemaRegistryEdit {
                 let id = self.props.id;
                 let query_address = self.query_address_form.clone();
                 self.link.send_future(async move {
-                    match CDLUpdateQueryAddress::fetch(GRAPHQL_URL.clone(), id, query_address).await
+                    match UpdateQueryAddressMut::fetch(GRAPHQL_URL.clone(), id, query_address).await
                     {
                         Ok(query_address) => {
                             Msg::QueryAddressUpdated(EditState::Edited(query_address))

@@ -7,10 +7,10 @@ use yew::Properties;
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "queries/schema.graphql",
-    query_path = "queries/all_schemas_query.graphql",
+    query_path = "queries/schema_history_query.graphql",
     response_derives = "Debug"
 )]
-pub struct AllSchemasQuery;
+pub struct SchemaHistoryQuery;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct CDLResponse {
@@ -18,19 +18,25 @@ struct CDLResponse {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Properties, PartialEq)]
-pub struct CDLSchemaData {
-    pub schemas: Vec<CDLSchemaView>,
+struct CDLSchemaData {
+    schema: CDLSchemaHistory,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Properties, PartialEq)]
+struct CDLSchemaHistory {
+    definitions: Vec<CDLSchemaDefinition>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct CDLSchemaView {
-    pub id: Uuid,
-    pub name: String,
+pub struct CDLSchemaDefinition {
+    pub version: String,
+    #[serde(rename = "definition")]
+    pub body: String,
 }
 
-impl AllSchemasQuery {
-    pub async fn fetch(endpoint: Url) -> Result<CDLSchemaData, String> {
-        let query = AllSchemasQuery::build_query(all_schemas_query::Variables);
+impl SchemaHistoryQuery {
+    pub async fn fetch(endpoint: Url, id: Uuid) -> Result<Vec<CDLSchemaDefinition>, String> {
+        let query = SchemaHistoryQuery::build_query(schema_history_query::Variables { id });
 
         let response: CDLResponse = reqwest::Client::new()
             .post(endpoint)
@@ -42,6 +48,6 @@ impl AllSchemasQuery {
             .await
             .map_err(|e| e.to_string())?;
 
-        Ok(response.data)
+        Ok(response.data.schema.definitions)
     }
 }

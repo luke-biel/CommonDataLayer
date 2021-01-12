@@ -27,7 +27,7 @@ pub struct CDLUpdateTopic {
     topic: String,
 }
 
-impl CDLUpdateTopic {
+impl UpdateTopicMut {
     pub async fn fetch(endpoint: Url, id: Uuid, topic: String) -> Result<String, String> {
         let query = UpdateTopicMut::build_query(update_topic_mut::Variables { id, topic });
 

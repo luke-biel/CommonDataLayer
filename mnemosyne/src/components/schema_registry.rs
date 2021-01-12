@@ -14,6 +14,8 @@ pub enum Page {
     View(Uuid),
     Edit(Uuid),
     AddDefinition(Uuid),
+    History(Uuid),
+    AddSchema,
 }
 
 pub enum Msg {
@@ -58,6 +60,8 @@ impl Component for SchemaRegistry {
             Page::View(id) => html! { <SchemaRegistryView id=id /> },
             Page::Edit(id) => html! { <SchemaRegistryEdit id=id /> },
             Page::AddDefinition(id) => html! { <SchemaRegistryAddDefinition id=id /> },
+            Page::History(id) => html! { <SchemaRegistryHistory id=id /> },
+            Page::AddSchema => html! { <SchemaRegistryAddSchema /> },
         }
     }
 }

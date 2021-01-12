@@ -41,7 +41,7 @@ pub struct CDLSchemaDefinition {
     pub body: String,
 }
 
-impl CDLSchema {
+impl SchemaPreviewQuery {
     pub async fn fetch(endpoint: Url, id: Uuid) -> Result<CDLSchema, String> {
         let query = SchemaPreviewQuery::build_query(schema_preview_query::Variables { id });
 

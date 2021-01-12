@@ -19,6 +19,7 @@ pub enum Msg {
     OpenView,
     OpenEdit,
     OpenAdd,
+    OpenHistory,
 }
 
 impl Component for RowView {
@@ -38,6 +39,7 @@ impl Component for RowView {
             Msg::OpenView => Page::View(self.props.schema.id),
             Msg::OpenEdit => Page::Edit(self.props.schema.id),
             Msg::OpenAdd => Page::AddDefinition(self.props.schema.id),
+            Msg::OpenHistory => Page::History(self.props.schema.id),
         };
 
         self.dispatcher.send(Request::Open(page));
@@ -53,6 +55,7 @@ impl Component for RowView {
         let on_view = self.link.callback(|_| Msg::OpenView);
         let on_edit = self.link.callback(|_| Msg::OpenEdit);
         let on_add = self.link.callback(|_| Msg::OpenAdd);
+        let on_history = self.link.callback(|_| Msg::OpenHistory);
 
         html! {
             <tr>
@@ -78,6 +81,13 @@ impl Component for RowView {
                         <path class="small-svg-button"
                               d="M551,713v6a1,1,0,0,0,2,0v-6h6a1,1,0,0,0,0-2h-6v-6a1,1,0,0,0-2,0v6h-6a1,1,0,0,0,0,2h6Z"
                               transform="translate(-544 -704)"/>
+                        </svg>
+                    </button>
+                    <button type="button" title="View schema history" class="small-action-button" onclick=on_history>
+                        <svg width="1.2em" height="1.2em" viewBox="0 0 16 16">
+                        <path class="small-svg-button"
+                              d="M557,416h-9a2,2,0,0,0-2,2v1a1,1,0,0,0,0,2v2a1,1,0,0,0,0,2v2a1,1,0,0,0,0,2v1a2,2,0,0,0,2,2h9a2,2,0,0,0,2-2V418A2,2,0,0,0,557,416Zm0,14h-9v-1a1,1,0,0,0,0-2v-2a1,1,0,0,0,0-2v-2a1,1,0,0,0,0-2v-1h9v12Zm-6-8h3a1,1,0,0,0,0-2h-3A1,1,0,0,0,551,422Z"
+                              transform="translate(-545 -416)"/>
                         </svg>
                     </button>
                 </td>
