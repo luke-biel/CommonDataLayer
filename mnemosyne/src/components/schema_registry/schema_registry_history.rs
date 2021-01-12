@@ -1,5 +1,4 @@
 use crate::cdl_objects::schema_history::{CDLSchemaDefinition, SchemaHistoryQuery};
-use crate::cdl_objects::schema_preview::CDLSchema;
 use crate::GRAPHQL_URL;
 use uuid::Uuid;
 use yew::prelude::*;

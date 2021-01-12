@@ -1,6 +1,6 @@
 use crate::cdl_objects::schema_preview::{CDLSchema, SchemaPreviewQuery};
-use crate::cdl_objects::update_query_address::{CDLUpdateQueryAddress, UpdateQueryAddressMut};
-use crate::cdl_objects::update_topic::{CDLUpdateTopic, UpdateTopicMut};
+use crate::cdl_objects::update_query_address::UpdateQueryAddressMut;
+use crate::cdl_objects::update_topic::UpdateTopicMut;
 use crate::GRAPHQL_URL;
 use std::fmt;
 use uuid::Uuid;

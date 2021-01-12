@@ -1,8 +1,9 @@
-use crate::cdl_objects::add_definition::{AddDefinitionMut, CDLAddDefinition};
-use crate::GRAPHQL_URL;
 use uuid::Uuid;
 use yew::prelude::*;
 use yewtil::future::LinkFuture;
+
+use crate::cdl_objects::add_definition::AddDefinitionMut;
+use crate::GRAPHQL_URL;
 
 pub struct SchemaRegistryAddDefinition {
     props: Props,

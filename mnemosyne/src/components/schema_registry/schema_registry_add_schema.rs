@@ -1,7 +1,5 @@
-use crate::cdl_objects::add_definition::{AddDefinitionMut, CDLAddDefinition};
 use crate::cdl_objects::add_schema::AddSchemaMut;
 use crate::GRAPHQL_URL;
-use uuid::Uuid;
 use yew::prelude::*;
 use yewtil::future::LinkFuture;
 
