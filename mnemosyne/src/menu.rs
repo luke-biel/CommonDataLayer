@@ -32,9 +32,7 @@ impl Component for Menu {
             Msg::SchemaRegistry => Page::SchemaRegistry,
         };
 
-        self
-            .dispatcher
-            .send(context_bus::Request::Open(page));
+        self.dispatcher.send(context_bus::Request::Open(page));
 
         false
     }

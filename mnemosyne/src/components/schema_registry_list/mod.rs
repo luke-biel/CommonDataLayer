@@ -1,7 +1,7 @@
-use yew::prelude::*;
-use crate::cdl_objects::all_schemas::CDLSchemas;
-use yewtil::future::LinkFuture;
+use crate::cdl_objects::all_schemas::CDLSchemaData;
 use crate::GRAPHQL_URL;
+use yew::prelude::*;
+use yewtil::future::LinkFuture;
 
 mod row_view;
 
@@ -12,13 +12,13 @@ pub struct SchemaRegistryList {
 }
 
 pub enum Msg {
-    SuccessfulFetch(CDLSchemas),
+    SuccessfulFetch(CDLSchemaData),
     Error(String),
 }
 
 pub enum State {
     Fetching,
-    List(CDLSchemas),
+    List(CDLSchemaData),
     Error(String),
 }
 
@@ -28,7 +28,7 @@ impl Component for SchemaRegistryList {
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         link.send_future(async move {
-            match CDLSchemas::fetch(GRAPHQL_URL.clone()).await {
+            match CDLSchemaData::fetch(GRAPHQL_URL.clone()).await {
                 Ok(schemas) => Msg::SuccessfulFetch(schemas),
                 Err(error) => Msg::Error(error),
             }
@@ -55,7 +55,7 @@ impl Component for SchemaRegistryList {
     fn view(&self) -> Html {
         match self.state {
             State::Fetching => html! { <h1>{ "Fetching schemas" }</h1> },
-            State::List(CDLSchemas { ref schemas }) => {
+            State::List(CDLSchemaData { ref schemas }) => {
                 html! {
                     <>
                     <h1>{"Schemas"}</h1>

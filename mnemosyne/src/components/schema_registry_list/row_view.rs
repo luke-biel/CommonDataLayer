@@ -1,13 +1,13 @@
 use crate::cdl_objects::all_schemas::CDLSchemaView;
-use yew::prelude::*;
-use yew::agent::Dispatcher;
-use crate::context_bus::{ContextBus, Request};
 use crate::components::schema_registry::Page;
+use crate::context_bus::{ContextBus, Request};
+use yew::agent::Dispatcher;
+use yew::prelude::*;
 
 pub struct RowView {
     props: Props,
     link: ComponentLink<Self>,
-    dispatcher: Dispatcher<ContextBus<Page>>
+    dispatcher: Dispatcher<ContextBus<Page>>,
 }
 
 #[derive(Clone, Debug, Properties)]

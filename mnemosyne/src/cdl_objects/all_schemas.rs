@@ -13,12 +13,12 @@ use yew::Properties;
 pub struct AllSchemasQuery;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct CDLSchemasData {
-    data: CDLSchemas,
+struct CDLResponse {
+    data: CDLSchemaData,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Properties, PartialEq)]
-pub struct CDLSchemas {
+pub struct CDLSchemaData {
     pub schemas: Vec<CDLSchemaView>,
 }
 
@@ -28,19 +28,20 @@ pub struct CDLSchemaView {
     pub name: String,
 }
 
-impl CDLSchemas {
-    pub async fn fetch(endpoint: Url) -> Result<CDLSchemas, String> {
+impl CDLSchemaData {
+    pub async fn fetch(endpoint: Url) -> Result<CDLSchemaData, String> {
         let query = AllSchemasQuery::build_query(all_schemas_query::Variables);
 
-        let response = reqwest::Client::new()
+        let response: CDLResponse = reqwest::Client::new()
             .post(endpoint)
             .json(&query)
             .send()
             .await
+            .map_err(|e| e.to_string())?
+            .json()
+            .await
             .map_err(|e| e.to_string())?;
 
-        let cdl_all_schemas: CDLSchemasData = response.json().await.map_err(|e| e.to_string())?;
-
-        Ok(cdl_all_schemas.data)
+        Ok(response.data)
     }
 }

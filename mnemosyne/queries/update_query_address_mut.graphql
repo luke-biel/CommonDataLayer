@@ -1,0 +1,5 @@
+mutation UpdateQueryAddressMut($id: Uuid!, $queryAddress: String!) {
+    updateSchema(id: $id, update: {queryAddress: $queryAddress}) {
+        queryAddress
+    }
+}

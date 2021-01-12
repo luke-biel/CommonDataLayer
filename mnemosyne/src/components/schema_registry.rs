@@ -1,7 +1,7 @@
-use uuid::Uuid;
-use yew::prelude::*;
 use crate::components::*;
 use crate::context_bus::ContextBus;
+use uuid::Uuid;
+use yew::prelude::*;
 
 pub struct SchemaRegistry {
     page: Page, // TODO: Make it a stack

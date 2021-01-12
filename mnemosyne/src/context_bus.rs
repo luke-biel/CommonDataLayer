@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use yew::worker::*;
 use std::marker::PhantomData;
+use yew::worker::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Request<T: Clone + 'static> {

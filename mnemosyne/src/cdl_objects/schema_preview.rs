@@ -13,12 +13,12 @@ use yew::Properties;
 pub struct SchemaPreviewQuery;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct CDLSchemaData {
-    data: CDLSchemaContainer,
+struct CDLResponse {
+    data: CDLSchemaData,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Properties, PartialEq)]
-struct CDLSchemaContainer {
+struct CDLSchemaData {
     schema: CDLSchema,
 }
 
@@ -45,15 +45,16 @@ impl CDLSchema {
     pub async fn fetch(endpoint: Url, id: Uuid) -> Result<CDLSchema, String> {
         let query = SchemaPreviewQuery::build_query(schema_preview_query::Variables { id });
 
-        let response = reqwest::Client::new()
+        let response: CDLResponse = reqwest::Client::new()
             .post(endpoint)
             .json(&query)
             .send()
             .await
+            .map_err(|e| e.to_string())?
+            .json()
+            .await
             .map_err(|e| e.to_string())?;
 
-        let cdl_schema_data: CDLSchemaData = response.json().await.map_err(|e| e.to_string())?;
-
-        Ok(cdl_schema_data.data.schema)
+        Ok(response.data.schema)
     }
 }

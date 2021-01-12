@@ -1,0 +1,7 @@
+mutation UpdateTopicMut($id: Uuid!, $topic: String!) {
+    updateSchema(id: $id, update: {
+        topic: $topic
+    }) {
+        topic
+    }
+}

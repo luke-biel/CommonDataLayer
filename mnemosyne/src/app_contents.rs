@@ -1,7 +1,7 @@
 use crate::components::*;
 use crate::context_bus::ContextBus;
+use serde::{Deserialize, Serialize};
 use yew::prelude::*;
-use serde::{Serialize, Deserialize};
 
 pub struct AppContents {
     page: Page,

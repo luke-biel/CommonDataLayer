@@ -1,8 +1,8 @@
+use crate::cdl_objects::schema_preview::CDLSchema;
+use crate::GRAPHQL_URL;
 use uuid::Uuid;
 use yew::prelude::*;
-use crate::cdl_objects::schema_preview::CDLSchema;
 use yewtil::future::LinkFuture;
-use crate::GRAPHQL_URL;
 
 pub struct SchemaRegistryView {
     props: Props,
