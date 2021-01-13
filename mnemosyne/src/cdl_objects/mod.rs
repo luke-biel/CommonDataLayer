@@ -79,5 +79,5 @@ where
         .json()
         .await?;
 
-    data.ok_or_else(|| Error::Query(errors))
+    data.ok_or(Error::Query(errors))
 }

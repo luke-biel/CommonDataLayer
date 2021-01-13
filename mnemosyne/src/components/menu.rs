@@ -50,14 +50,14 @@ impl Component for Menu {
                 <div class="nav-logo">{ "Mnemosyne" }</div>
                 <ul class="nav-links">
                     <li>
-                    <a onclick=open_index>
-                        { "HOME" }
-                    </a>
+                        <a onclick=open_index>
+                            { "HOME" }
+                        </a>
                     </li>
                     <li>
-                    <a onclick=open_schema_registry>
-                        { "SCHEMA REGISTRY" }
-                    </a>
+                        <a onclick=open_schema_registry>
+                            { "SCHEMA REGISTRY" }
+                        </a>
                     </li>
                 </ul>
             </>
