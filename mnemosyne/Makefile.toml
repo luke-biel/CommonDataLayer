@@ -12,7 +12,7 @@ args = ["build"]
 [tasks.rebuild]
 dependencies = ["clean-wasm", "pack-wasm"]
 command = "cargo"
-args = "build"
+args = ["build"]
 
 [tasks.start]
 dependencies = ["build"]
