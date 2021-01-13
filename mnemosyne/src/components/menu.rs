@@ -1,4 +1,4 @@
-use crate::app_contents::Page;
+use crate::components::app_contents::Page;
 use crate::context_bus;
 use crate::context_bus::ContextBus;
 use yew::agent::Dispatcher;
@@ -47,14 +47,20 @@ impl Component for Menu {
 
         html! {
             <>
-                { "Mnemosyne" }
-                <button onclick=open_index>
-                    { "HOME" }
-                </ button>
-                <button onclick=open_schema_registry>
-                    { "SCHEMA REGISTRY" }
-                </ button>
-            </ >
+                <div class="nav-logo">{ "Mnemosyne" }</div>
+                <ul class="nav-links">
+                    <li>
+                    <a onclick=open_index>
+                        { "HOME" }
+                    </a>
+                    </li>
+                    <li>
+                    <a onclick=open_schema_registry>
+                        { "SCHEMA REGISTRY" }
+                    </a>
+                    </li>
+                </ul>
+            </>
         }
     }
 }

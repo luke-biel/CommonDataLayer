@@ -122,16 +122,35 @@ impl Component for SchemaRegistryAddSchema {
         html! {
             <>
             <form onsubmit=on_submit>
-                <input type="text" placeholder="schema name" oninput=oninput_name />
-                <input type="text" placeholder="schema topic" oninput=oninput_topic />
-                <input type="text" placeholder="schema query_address" oninput=oninput_query_address />
-                <select name="storage_type" onchange=onchange_typ >
-                    <option hidden=true disabled=true selected=true></option>
-                    <option value=SchemaType::DOCUMENT_STORAGE >{ SchemaType::DOCUMENT_STORAGE }</option>
-                    <option value=SchemaType::TIMESERIES >{ SchemaType::TIMESERIES }</option>
-                </select>
-                <textarea oninput=oninput_definition />
-                <button type="submit">{ "Add schema" }</button>
+                <div class="form-control">
+                    <label>{ "New schema name" }</label>
+                    <input type="text" placeholder="schema name" oninput=oninput_name />
+                </div>
+                <div class="form-control-group">
+                    <div class="form-control">
+                        <label>{ "Ingestion topic" }</label>
+                        <input type="text" placeholder="topic" oninput=oninput_topic />
+                    </div>
+                    <div class="form-control">
+                        <label>{ "Query service address" }</label>
+                        <input type="text" placeholder="query address" oninput=oninput_query_address />
+                    </div>
+                </div>
+                <div class="form-control">
+                    <label>{ "Repository type" }</label>
+                    <select name="storage_type" onchange=onchange_typ >
+                        <option hidden=true disabled=true selected=true></option>
+                        <option value=SchemaType::DOCUMENT_STORAGE >{ SchemaType::DOCUMENT_STORAGE }</option>
+                        <option value=SchemaType::TIMESERIES >{ SchemaType::TIMESERIES }</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label>{ "Json Schema" }</label>
+                    <textarea oninput=oninput_definition />
+                </div>
+                <div class="form-control">
+                    <button class="button-primary button-round" type="submit">{ "Add schema" }</button>
+                </div>
             </form>
             </>
         }

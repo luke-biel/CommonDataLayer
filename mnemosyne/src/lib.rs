@@ -7,15 +7,14 @@ use wasm_bindgen::prelude::*;
 use yew::utils::document;
 use yew::{html, App, Component, ComponentLink, Html};
 
-use crate::app_contents::AppContents;
-use crate::components::NotificationBar;
-use crate::menu::Menu;
+use components::app_contents::AppContents;
+use components::menu::Menu;
 
-mod app_contents;
+use crate::components::NotificationBar;
+
 mod cdl_objects;
 mod components;
 mod context_bus;
-mod menu;
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -42,13 +41,20 @@ impl Component for Model {
         false
     }
 
-    //noinspection RsTypeCheck
     fn view(&self) -> Html {
         html! {
             <>
-                <Menu />
-                <AppContents />
-                <NotificationBar />
+            <nav>
+                <div class="nav-container"><Menu /></div>
+            </nav>
+            <main>
+                <div class="container">
+                    <div class="row">
+                        <div class="col col-sm-12 col-xlg-8"><AppContents /></div>
+                        <div class="col col-sm-12 col-xlg-4"><NotificationBar /></div>
+                    </div>
+                </div>
+            </main>
             </>
         }
     }

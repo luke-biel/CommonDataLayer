@@ -5,7 +5,6 @@ use yew::prelude::*;
 use yewtil::future::LinkFuture;
 
 pub struct SchemaRegistryView {
-    props: Props,
     state: State,
 }
 
@@ -39,7 +38,6 @@ impl Component for SchemaRegistryView {
         });
 
         Self {
-            props,
             state: State::Fetching,
         }
     }
@@ -59,15 +57,41 @@ impl Component for SchemaRegistryView {
 
     fn view(&self) -> Html {
         match self.state {
-            State::Fetching => html! { <h1>{ "fetching " }{ self.props.id }</h1> },
+            State::Fetching => html! {
+                <div class="progress-bar striped animated">
+                    <span class="progress-bar-green" style="width: 60%;"></span>
+                </div>
+            },
             State::View(ref schema) => html! {
                 <>
-                <h1>{ schema.name.as_str() }</h1>
-                <h2>{ schema.id }</h2>
-                <h2>{ "topic: " }{ schema.topic.as_str() }</h2>
-                <h2>{ "query_address: " }{ schema.query_address.as_str() }</h2>
-                <h2>{ "type: " }{ schema.repository_type.as_str() }</h2>
-                <h3>{ "version: " }{ schema.definition.version.as_str() }</h3>
+                <div class="form-control-group">
+                    <div class="form-control">
+                        <legend>{ "schema name" }</legend>
+                        <strong>{ schema.name.as_str() }</strong>
+                    </div>
+                    <div class="form-control">
+                        <legend>{ "schema id" }</legend>
+                        <strong>{ schema.id }</strong>
+                    </div>
+                </div>
+                <div class="form-control-group">
+                    <div class="form-control">
+                        <legend>{ "topic" }</legend>
+                        <strong>{ schema.topic.as_str() }</strong>
+                    </div>
+                    <div class="form-control">
+                        <legend>{ "query address" }</legend>
+                        <strong>{ schema.query_address.as_str() }</strong>
+                    </div>
+                </div>
+                <div class="form-control">
+                    <legend>{ "repository type" }</legend>
+                    <strong>{ schema.repository_type.as_str() }</strong>
+                </div>
+                <div class="form-control">
+                    <legend>{ "schema version" }</legend>
+                    <strong>{ schema.definition.version.as_str() }</strong>
+                </div>
                 <pre>
                     <code>
                         { schema.definition.body.as_str() }

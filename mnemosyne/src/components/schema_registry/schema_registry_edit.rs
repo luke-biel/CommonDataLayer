@@ -140,16 +140,26 @@ impl Component for SchemaRegistryEdit {
             .callback(|ev: InputData| Msg::UpdateQueryAddress(ev.value));
 
         match &self.state {
-            State::Fetching => html! { <h1>{ "fetching " }{ self.props.id }</h1> },
+            State::Fetching => html! {
+                <div class="progress-bar striped animated">
+                    <span class="progress-bar-green" style="width: 60%;"></span>
+                </div>
+            },
             State::Edit(schema) => html! {
                 <>
                 <form onsubmit=on_topic>
-                    <input type="text" placeholder=schema.topic.as_str() oninput=oninput_topic />
-                    <button>{ "CHANGE TOPIC" }</button>
+                    <div class="form-control">
+                        <label>{ "Topic" }</label>
+                        <input type="text" placeholder=schema.topic.as_str() oninput=oninput_topic />
+                    </div>
+                    <button class="button-primary button-round">{ "Change topic" }</button>
                 </form>
                 <form onsubmit=on_query_address>
-                    <input type="text" placeholder=schema.query_address.as_str() oninput=oninput_query_address />
-                    <button>{ "CHANGE QUERY ADDRESS" }</button>
+                    <div class="form-control">
+                        <label>{ "Query address" }</label>
+                        <input type="text" placeholder=schema.query_address.as_str() oninput=oninput_query_address />
+                    </div>
+                    <button  class="button-primary button-round">{ "Change query address" }</button>
                 </form>
                 </>
             },

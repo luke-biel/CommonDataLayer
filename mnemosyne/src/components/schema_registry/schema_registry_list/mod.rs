@@ -49,7 +49,10 @@ impl Component for SchemaRegistryList {
 
     fn update(&mut self, msg: Self::Message) -> bool {
         match msg {
-            Msg::SuccessfulFetch(schemas) => self.state = State::List(schemas),
+            Msg::SuccessfulFetch(mut data) => {
+                data.schemas.sort_by(|s1, s2| s1.id.cmp(&s2.id));
+                self.state = State::List(data)
+            }
             Msg::Error(error) => self.state = State::Error(error),
             Msg::OpenAdd => self.dispatcher.send(Request::Send(Page::AddSchema)),
         }
@@ -65,31 +68,39 @@ impl Component for SchemaRegistryList {
         let on_add = self.link.callback(|_| Msg::OpenAdd);
 
         match self.state {
-            State::Fetching => html! { <h1>{ "Fetching schemas" }</h1> },
+            State::Fetching => html! {
+                <div class="progress-bar striped animated">
+                    <span class="progress-bar-green" style="width: 60%;"></span>
+                </div>
+            },
             State::List(CDLSchemaData { ref schemas }) => {
                 html! {
                     <>
-                    <h1>
+                    <h1 class="h3">
                         { "Schemas" }
-                        <button type="button" title="Add schema" class="small-action-button" onclick=on_add>
+                        <button type="button" title="Add schema" class="float-right button-primary button-round" onclick=on_add>
                             <svg width="1.2em" height="1.2em" viewBox="0 0 16 16">
-                            <path class="small-svg-button"
+                            <path style="fill: #ffffff"
                                   d="M551,713v6a1,1,0,0,0,2,0v-6h6a1,1,0,0,0,0-2h-6v-6a1,1,0,0,0-2,0v6h-6a1,1,0,0,0,0,2h6Z"
                                   transform="translate(-544 -704)"/>
                             </svg>
                         </button>
                     </h1>
-                    <table class="simple-summary">
+                    <table>
+                        <thead>
                         <tr>
-                            <td class="simple-summary-heading">{ "Name" }</td>
-                            <td class="simple-summary-heading">{ "Unique Id" }</td>
-                            <td class="simple-summary-heading">{ "Actions" }</td>
+                            <th>{ "Name" }</th>
+                            <th>{ "Unique Id" }</th>
+                            <th>{ "Actions" }</th>
                         </tr>
+                        </thead>
+                        <tbody>
                         {
                             schemas.iter().map(|schema| {
                                 html! { <RowView schema=schema /> }
                             }).collect::<Html>()
                         }
+                        </tbody>
                     </table>
                     </>
                 }

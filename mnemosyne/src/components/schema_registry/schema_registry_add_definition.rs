@@ -95,9 +95,17 @@ impl Component for SchemaRegistryAddDefinition {
         html! {
             <>
             <form onsubmit=on_submit>
-                <input type="text" placeholder="x.y.z" oninput=oninput_version/>
-                <textarea oninput=oninput_definition />
-                <button type="submit">{ "Add schema definition" }</button>
+                <div class="form-control">
+                    <label>{ "Version" }</label>
+                    <input type="text" placeholder="x.y.z" oninput=oninput_version/>
+                </div>
+                <div class="form-control">
+                    <label>{ "Definition" }</label>
+                    <textarea oninput=oninput_definition />
+                </div>
+                <div class="form-control">
+                    <button class="button-primary button-round" type="submit">{ "Add schema definition" }</button>
+                </div>
             </form>
             </>
         }

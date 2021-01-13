@@ -59,20 +59,37 @@ impl Component for SchemaRegistryHistory {
 
     fn view(&self) -> Html {
         match self.state {
-            State::Fetching => html! { <h1>{ "fetching " }{ self.props.id }</h1> },
-            State::View(ref schema) => schema
-                .iter()
-                .map(|def| {
-                    html! {
-                        <>
-                        <h2>{ def.version.as_str() }</h2>
-                        <pre>
-                            <code>{ def.body.as_str() }</code>
-                        </pre>
-                        </>
+            State::Fetching => html! {
+                <div class="progress-bar striped animated">
+                    <span class="progress-bar-green" style="width: 60%;"></span>
+                </div>
+            },
+            State::View(ref schema) => html! {
+                <>
+                    <h4>{ "History of schema " }{ self.props.id }</h4>
+                    {
+                        schema
+                        .iter()
+                        .map(|def| {
+                            html! {
+                                <>
+                                <div class="panel">
+                                    <div class="panel-head">
+                                        <h5 class="panel-title">{ def.version.as_str() }</h5>
+                                    </div>
+                                    <div class="panel-body">
+                                        <pre>
+                                            <code>{ def.body.as_str() }</code>
+                                        </pre>
+                                    </div>
+                                </div>
+                                </>
+                            }
+                        })
+                        .collect::<Html>()
                     }
-                })
-                .collect::<Html>(),
+                </>
+            },
             State::Error(ref error) => html! { <h1>{ error }</h1> },
         }
     }

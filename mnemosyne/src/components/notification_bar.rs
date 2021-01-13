@@ -50,7 +50,18 @@ impl Component for NotificationBar {
     fn view(&self) -> Html {
         self.stack
             .iter()
-            .map(|n| html! { <span>{ n.msg.as_str() }</span> })
+            .map(|n| {
+                html! {
+                    <div class="card">
+                        <div class="card-title">
+                            { n.severity }
+                        </div>
+                        <p>
+                            { n.msg.as_str() }
+                        </p>
+                    </div>
+                }
+            })
             .collect::<Html>()
     }
 }
