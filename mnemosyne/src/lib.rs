@@ -8,13 +8,14 @@ use yew::utils::document;
 use yew::{html, App, Component, ComponentLink, Html};
 
 use crate::app_contents::AppContents;
+use crate::components::NotificationBar;
 use crate::menu::Menu;
 
 mod app_contents;
 mod cdl_objects;
 mod components;
 mod context_bus;
-pub mod menu;
+mod menu;
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -47,6 +48,7 @@ impl Component for Model {
             <>
                 <Menu />
                 <AppContents />
+                <NotificationBar />
             </>
         }
     }

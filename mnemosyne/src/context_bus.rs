@@ -5,7 +5,7 @@ use yew::worker::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Request<T: Clone + 'static> {
-    Open(T),
+    Send(T),
 }
 
 pub struct ContextBus<T: Clone + 'static> {
@@ -36,7 +36,7 @@ impl<T: Clone + 'static> Agent for ContextBus<T> {
 
     fn handle_input(&mut self, msg: Self::Input, _id: HandlerId) {
         match msg {
-            Request::Open(page) => {
+            Request::Send(page) => {
                 for sub in self.subscribers.iter().copied() {
                     self.link.respond(sub, page.clone());
                 }

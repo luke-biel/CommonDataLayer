@@ -42,7 +42,7 @@ impl Component for RowView {
             Msg::OpenHistory => Page::History(self.props.schema.id),
         };
 
-        self.dispatcher.send(Request::Open(page));
+        self.dispatcher.send(Request::Send(page));
 
         false
     }

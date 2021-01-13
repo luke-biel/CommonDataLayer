@@ -3,6 +3,9 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::cdl_objects;
+use crate::cdl_objects::Error;
+
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "queries/schema.graphql",
@@ -10,11 +13,6 @@ use uuid::Uuid;
     response_derives = "Debug"
 )]
 pub struct AddDefinitionMut;
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct CDLResponse {
-    data: CDLAddDefinitionData,
-}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct CDLAddDefinitionData {
@@ -33,23 +31,15 @@ impl AddDefinitionMut {
         id: Uuid,
         version: String,
         definition: String,
-    ) -> Result<String, String> {
+    ) -> Result<String, Error> {
         let query = AddDefinitionMut::build_query(add_definition_mut::Variables {
             id,
             version,
             definition,
         });
 
-        let response: CDLResponse = reqwest::Client::new()
-            .post(endpoint)
-            .json(&query)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?
-            .json()
-            .await
-            .map_err(|e| e.to_string())?;
+        let response: CDLAddDefinitionData = cdl_objects::query_graphql(endpoint, &query).await?;
 
-        Ok(response.data.add_schema_definition.definition)
+        Ok(response.add_schema_definition.definition)
     }
 }

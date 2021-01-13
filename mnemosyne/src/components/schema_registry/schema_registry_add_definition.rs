@@ -3,14 +3,23 @@ use yew::prelude::*;
 use yewtil::future::LinkFuture;
 
 use crate::cdl_objects::add_definition::AddDefinitionMut;
-use crate::GRAPHQL_URL;
+use crate::components::notification_bar::Notification;
+use crate::context_bus::{ContextBus, Request};
+use crate::{cdl_objects, GRAPHQL_URL};
+use log::Level;
+use yew::agent::Dispatcher;
 
 pub struct SchemaRegistryAddDefinition {
     props: Props,
     link: ComponentLink<Self>,
+    notifications: Dispatcher<ContextBus<Notification>>,
+    form: Form,
+}
+
+#[derive(Default)]
+pub struct Form {
     version: String,
     definition: String,
-    msg: String,
 }
 
 #[derive(Debug, Clone, Properties)]
@@ -22,7 +31,7 @@ pub enum Msg {
     UpdateVersion(String),
     UpdateDefinition(String),
     AddSchema,
-    SchemaAdded(String),
+    SchemaAdded(Result<String, cdl_objects::Error>),
 }
 
 impl Component for SchemaRegistryAddDefinition {
@@ -33,30 +42,35 @@ impl Component for SchemaRegistryAddDefinition {
         Self {
             props,
             link,
-            version: "".to_string(),
-            definition: "".to_string(),
-            msg: "".to_string(),
+            notifications: ContextBus::<Notification>::dispatcher(),
+            form: Default::default(),
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> bool {
         match msg {
-            Msg::UpdateVersion(val) => self.version = val,
-            Msg::UpdateDefinition(val) => self.definition = val,
+            Msg::UpdateVersion(val) => self.form.version = val,
+            Msg::UpdateDefinition(val) => self.form.definition = val,
             Msg::AddSchema => {
                 let id = self.props.id;
-                let version = self.version.clone();
-                let definition = self.definition.clone();
+                let version = self.form.version.clone();
+                let definition = self.form.definition.clone();
                 self.link.send_future(async move {
-                    match AddDefinitionMut::fetch(GRAPHQL_URL.clone(), id, version, definition)
-                        .await
-                    {
-                        Ok(definition) => Msg::SchemaAdded(definition),
-                        Err(error) => Msg::SchemaAdded(error), // TODO: Change to custom error
-                    }
+                    Msg::SchemaAdded(
+                        AddDefinitionMut::fetch(GRAPHQL_URL.clone(), id, version, definition).await,
+                    )
                 })
             }
-            Msg::SchemaAdded(msg) => self.msg = msg, // TODO: Hold state elsewhere
+            Msg::SchemaAdded(msg) => match msg {
+                Ok(def) => self.notifications.send(Request::Send(Notification {
+                    msg: format!("Added new schema definition {}", def),
+                    severity: Level::Info,
+                })),
+                Err(error) => self.notifications.send(Request::Send(Notification {
+                    msg: error.to_string(),
+                    severity: Level::Error,
+                })),
+            },
         }
 
         true
@@ -84,7 +98,6 @@ impl Component for SchemaRegistryAddDefinition {
                 <input type="text" placeholder="x.y.z" oninput=oninput_version/>
                 <textarea oninput=oninput_definition />
                 <button type="submit">{ "Add schema definition" }</button>
-                <label>{ self.msg.as_str() }</label>
             </form>
             </>
         }

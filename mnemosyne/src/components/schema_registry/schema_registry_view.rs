@@ -1,5 +1,5 @@
 use crate::cdl_objects::schema_preview::{CDLSchema, SchemaPreviewQuery};
-use crate::GRAPHQL_URL;
+use crate::{cdl_objects, GRAPHQL_URL};
 use uuid::Uuid;
 use yew::prelude::*;
 use yewtil::future::LinkFuture;
@@ -17,12 +17,12 @@ pub struct Props {
 pub enum State {
     Fetching,
     View(CDLSchema),
-    Error(String),
+    Error(cdl_objects::Error),
 }
 
 pub enum Msg {
     SuccessfulFetch(CDLSchema),
-    Error(String),
+    Error(cdl_objects::Error),
 }
 
 impl Component for SchemaRegistryView {

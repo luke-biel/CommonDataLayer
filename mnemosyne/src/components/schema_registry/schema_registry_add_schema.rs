@@ -1,12 +1,17 @@
-use crate::cdl_objects::add_schema::AddSchemaMut;
-use crate::GRAPHQL_URL;
+use crate::cdl_objects::add_schema::{add_schema_mut::SchemaType, AddSchemaMut};
+use crate::components::notification_bar::Notification;
+use crate::context_bus::{ContextBus, Request};
+use crate::{cdl_objects, GRAPHQL_URL};
+use log::Level;
+use uuid::Uuid;
+use yew::agent::Dispatcher;
 use yew::prelude::*;
 use yewtil::future::LinkFuture;
 
 pub struct SchemaRegistryAddSchema {
     link: ComponentLink<Self>,
     form: Form,
-    msg: String,
+    notifications: Dispatcher<ContextBus<Notification>>,
 }
 
 #[derive(Default)]
@@ -15,7 +20,7 @@ struct Form {
     query_address: String,
     topic: String,
     definition: String,
-    typ: String,
+    typ: SchemaType,
 }
 
 pub enum Msg {
@@ -23,9 +28,9 @@ pub enum Msg {
     UpdateQueryAddress(String),
     UpdateTopic(String),
     UpdateDefinition(String),
-    UpdateTyp(String),
+    UpdateTyp(SchemaType),
     AddSchema,
-    SchemaAdded(String),
+    SchemaAdded(Result<Uuid, cdl_objects::Error>),
 }
 
 impl Component for SchemaRegistryAddSchema {
@@ -36,7 +41,7 @@ impl Component for SchemaRegistryAddSchema {
         Self {
             link,
             form: Default::default(),
-            msg: "".to_string(),
+            notifications: ContextBus::<Notification>::dispatcher(),
         }
     }
 
@@ -65,12 +70,21 @@ impl Component for SchemaRegistryAddSchema {
                     )
                     .await
                     {
-                        Ok(id) => Msg::SchemaAdded(id.to_string()),
-                        Err(error) => Msg::SchemaAdded(error), // TODO: Change to custom error
+                        Ok(id) => Msg::SchemaAdded(Ok(id)),
+                        Err(error) => Msg::SchemaAdded(Err(error)),
                     }
                 })
             }
-            Msg::SchemaAdded(msg) => self.msg = msg, // TODO: Hold state elsewhere
+            Msg::SchemaAdded(msg) => match msg {
+                Ok(id) => self.notifications.send(Request::Send(Notification {
+                    msg: format!("Saved schema under id {}", id),
+                    severity: Level::Info,
+                })),
+                Err(err) => self.notifications.send(Request::Send(Notification {
+                    msg: err.to_string(),
+                    severity: Level::Error,
+                })),
+            },
         }
 
         true
@@ -93,7 +107,7 @@ impl Component for SchemaRegistryAddSchema {
         let onchange_typ = self.link.callback(|ev: ChangeData| {
             match ev {
                 ChangeData::Value(_) => unimplemented!(), // Can't ever happen
-                ChangeData::Select(sel) => Msg::UpdateTyp(sel.value()),
+                ChangeData::Select(sel) => Msg::UpdateTyp(sel.value().parse().unwrap()), // Given we use `select` this cannot fail
                 ChangeData::Files(_) => unimplemented!(), // Can't ever happen
             }
         });
@@ -113,12 +127,11 @@ impl Component for SchemaRegistryAddSchema {
                 <input type="text" placeholder="schema query_address" oninput=oninput_query_address />
                 <select name="storage_type" onchange=onchange_typ >
                     <option hidden=true disabled=true selected=true></option>
-                    <option value="DOCUMENT_STORAGE">{ "DOCUMENT_STORAGE" }</option>
-                    <option value="TIMESERIES">{ "TIMESERIES" }</option>
+                    <option value=SchemaType::DOCUMENT_STORAGE >{ SchemaType::DOCUMENT_STORAGE }</option>
+                    <option value=SchemaType::TIMESERIES >{ SchemaType::TIMESERIES }</option>
                 </select>
                 <textarea oninput=oninput_definition />
                 <button type="submit">{ "Add schema" }</button>
-                <label>{ self.msg.as_str() }</label>
             </form>
             </>
         }

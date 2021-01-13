@@ -1,9 +1,7 @@
 [workspace]
 members = [
-  "crates/*"
-]
-exclude = [
-  "mnemosyne"
+  "crates/*",
+  "mnemosyne",
 ]
 
 [profile.release]

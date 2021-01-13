@@ -1,3 +1,5 @@
+use crate::cdl_objects;
+use crate::cdl_objects::Error;
 use graphql_client::GraphQLQuery;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -12,11 +14,6 @@ use uuid::Uuid;
 pub struct UpdateQueryAddressMut;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct CDLResponse {
-    data: CDLUpdateSchemaData,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
 struct CDLUpdateSchemaData {
     #[serde(rename = "updateSchema")]
     update_schema: CDLUpdateQueryAddress,
@@ -29,22 +26,14 @@ pub struct CDLUpdateQueryAddress {
 }
 
 impl UpdateQueryAddressMut {
-    pub async fn fetch(endpoint: Url, id: Uuid, query_address: String) -> Result<String, String> {
+    pub async fn fetch(endpoint: Url, id: Uuid, query_address: String) -> Result<String, Error> {
         let query = UpdateQueryAddressMut::build_query(update_query_address_mut::Variables {
             id,
             query_address,
         });
 
-        let response: CDLResponse = reqwest::Client::new()
-            .post(endpoint)
-            .json(&query)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?
-            .json()
-            .await
-            .map_err(|e| e.to_string())?;
+        let response: CDLUpdateSchemaData = cdl_objects::query_graphql(endpoint, &query).await?;
 
-        Ok(response.data.update_schema.query_address)
+        Ok(response.update_schema.query_address)
     }
 }

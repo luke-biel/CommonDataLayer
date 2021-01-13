@@ -1,3 +1,5 @@
+use crate::cdl_objects;
+use crate::cdl_objects::Error;
 use graphql_client::GraphQLQuery;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -11,11 +13,6 @@ use yew::Properties;
     response_derives = "Debug"
 )]
 pub struct SchemaHistoryQuery;
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct CDLResponse {
-    data: CDLSchemaData,
-}
 
 #[derive(Clone, Debug, Deserialize, Serialize, Properties, PartialEq)]
 struct CDLSchemaData {
@@ -35,19 +32,11 @@ pub struct CDLSchemaDefinition {
 }
 
 impl SchemaHistoryQuery {
-    pub async fn fetch(endpoint: Url, id: Uuid) -> Result<Vec<CDLSchemaDefinition>, String> {
+    pub async fn fetch(endpoint: Url, id: Uuid) -> Result<Vec<CDLSchemaDefinition>, Error> {
         let query = SchemaHistoryQuery::build_query(schema_history_query::Variables { id });
 
-        let response: CDLResponse = reqwest::Client::new()
-            .post(endpoint)
-            .json(&query)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?
-            .json()
-            .await
-            .map_err(|e| e.to_string())?;
+        let response: CDLSchemaData = cdl_objects::query_graphql(endpoint, &query).await?;
 
-        Ok(response.data.schema.definitions)
+        Ok(response.schema.definitions)
     }
 }

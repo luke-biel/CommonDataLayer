@@ -1,16 +1,19 @@
 use crate::cdl_objects::schema_preview::{CDLSchema, SchemaPreviewQuery};
 use crate::cdl_objects::update_query_address::UpdateQueryAddressMut;
 use crate::cdl_objects::update_topic::UpdateTopicMut;
-use crate::GRAPHQL_URL;
-use std::fmt;
+use crate::components::notification_bar::Notification;
+use crate::context_bus::{ContextBus, Request};
+use crate::{cdl_objects, GRAPHQL_URL};
+use log::Level;
 use uuid::Uuid;
+use yew::agent::Dispatcher;
 use yew::prelude::*;
 use yewtil::future::LinkFuture;
 
-#[derive(Clone, Debug)]
 pub struct SchemaRegistryEdit {
     link: ComponentLink<Self>,
     props: Props,
+    notifications: Dispatcher<ContextBus<Notification>>,
     state: State,
     topic_form: String,
     query_address_form: String,
@@ -21,43 +24,21 @@ pub struct Props {
     pub id: Uuid,
 }
 
-#[derive(Clone, Debug)]
 enum State {
     Fetching,
-    Edit {
-        schema: CDLSchema,
-        topic: EditState,
-        query_address: EditState,
-    },
-    Error(String),
+    Edit(CDLSchema),
+    Error(cdl_objects::Error),
 }
 
 pub enum Msg {
     SuccessfulFetch(CDLSchema),
-    Error(String),
+    Error(cdl_objects::Error),
     EditTopic,
     EditQueryAddress,
     UpdateTopic(String),
     UpdateQueryAddress(String),
-    TopicUpdated(EditState),
-    QueryAddressUpdated(EditState),
-}
-
-#[derive(Clone, Debug)]
-pub enum EditState {
-    Void,
-    Edited(String),
-    Errored(String),
-}
-
-impl fmt::Display for EditState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EditState::Void => f.write_str(""),
-            EditState::Edited(val) => write!(f, "edited {}", val),
-            EditState::Errored(err) => write!(f, "failed {}", err),
-        }
-    }
+    TopicUpdated(Result<String, cdl_objects::Error>),
+    QueryAddressUpdated(Result<String, cdl_objects::Error>),
 }
 
 impl Component for SchemaRegistryEdit {
@@ -76,6 +57,7 @@ impl Component for SchemaRegistryEdit {
         Self {
             link,
             props,
+            notifications: ContextBus::<Notification>::dispatcher(),
             state: State::Fetching,
             topic_form: "".to_string(),
             query_address_form: "".to_string(),
@@ -84,21 +66,15 @@ impl Component for SchemaRegistryEdit {
 
     fn update(&mut self, msg: Self::Message) -> bool {
         match msg {
-            Msg::SuccessfulFetch(schema) => {
-                self.state = State::Edit {
-                    schema,
-                    topic: EditState::Void,
-                    query_address: EditState::Void,
-                }
-            }
+            Msg::SuccessfulFetch(schema) => self.state = State::Edit(schema),
             Msg::Error(error) => self.state = State::Error(error),
             Msg::EditTopic => {
                 let id = self.props.id;
                 let topic = self.topic_form.clone();
                 self.link.send_future(async move {
                     match UpdateTopicMut::fetch(GRAPHQL_URL.clone(), id, topic).await {
-                        Ok(topic) => Msg::TopicUpdated(EditState::Edited(topic)),
-                        Err(err) => Msg::TopicUpdated(EditState::Errored(err)),
+                        Ok(topic) => Msg::TopicUpdated(Ok(topic)),
+                        Err(err) => Msg::TopicUpdated(Err(err)),
                     }
                 })
             }
@@ -108,37 +84,33 @@ impl Component for SchemaRegistryEdit {
                 self.link.send_future(async move {
                     match UpdateQueryAddressMut::fetch(GRAPHQL_URL.clone(), id, query_address).await
                     {
-                        Ok(query_address) => {
-                            Msg::QueryAddressUpdated(EditState::Edited(query_address))
-                        }
-                        Err(err) => Msg::QueryAddressUpdated(EditState::Errored(err)),
+                        Ok(query_address) => Msg::QueryAddressUpdated(Ok(query_address)),
+                        Err(err) => Msg::QueryAddressUpdated(Err(err)),
                     }
                 })
             }
             Msg::UpdateTopic(val) => self.topic_form = val,
             Msg::UpdateQueryAddress(val) => self.query_address_form = val,
-            Msg::TopicUpdated(change) => {
-                if let State::Edit { ref mut topic, .. } = self.state {
-                    *topic = change;
-                } else {
-                    log::error!(
-                        "Couldn't display topic update. SchemaRegistryEdit was in invalid state"
-                    )
-                }
-            }
-            Msg::QueryAddressUpdated(change) => {
-                if let State::Edit {
-                    ref mut query_address,
-                    ..
-                } = self.state
-                {
-                    *query_address = change;
-                } else {
-                    log::error!(
-                        "Couldn't display query_address update. SchemaRegistryEdit was in invalid state"
-                    )
-                }
-            }
+            Msg::TopicUpdated(change) => match change {
+                Ok(topic) => self.notifications.send(Request::Send(Notification {
+                    msg: format!("Topic updated, new topic {}", topic),
+                    severity: Level::Info,
+                })),
+                Err(error) => self.notifications.send(Request::Send(Notification {
+                    msg: error.to_string(),
+                    severity: Level::Error,
+                })),
+            },
+            Msg::QueryAddressUpdated(change) => match change {
+                Ok(qa) => self.notifications.send(Request::Send(Notification {
+                    msg: format!("Query address updated, new url {}", qa),
+                    severity: Level::Info,
+                })),
+                Err(error) => self.notifications.send(Request::Send(Notification {
+                    msg: error.to_string(),
+                    severity: Level::Error,
+                })),
+            },
         }
 
         true
@@ -167,23 +139,17 @@ impl Component for SchemaRegistryEdit {
             .link
             .callback(|ev: InputData| Msg::UpdateQueryAddress(ev.value));
 
-        match self.state {
+        match &self.state {
             State::Fetching => html! { <h1>{ "fetching " }{ self.props.id }</h1> },
-            State::Edit {
-                ref schema,
-                ref topic,
-                ref query_address,
-            } => html! {
+            State::Edit(schema) => html! {
                 <>
                 <form onsubmit=on_topic>
                     <input type="text" placeholder=schema.topic.as_str() oninput=oninput_topic />
                     <button>{ "CHANGE TOPIC" }</button>
-                    <label>{ topic }</label>
                 </form>
                 <form onsubmit=on_query_address>
                     <input type="text" placeholder=schema.query_address.as_str() oninput=oninput_query_address />
                     <button>{ "CHANGE QUERY ADDRESS" }</button>
-                    <label>{ query_address }</label>
                 </form>
                 </>
             },

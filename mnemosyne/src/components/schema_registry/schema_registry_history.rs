@@ -1,5 +1,5 @@
 use crate::cdl_objects::schema_history::{CDLSchemaDefinition, SchemaHistoryQuery};
-use crate::GRAPHQL_URL;
+use crate::{cdl_objects, GRAPHQL_URL};
 use uuid::Uuid;
 use yew::prelude::*;
 use yewtil::future::LinkFuture;
@@ -17,12 +17,12 @@ pub struct Props {
 pub enum State {
     Fetching,
     View(Vec<CDLSchemaDefinition>),
-    Error(String),
+    Error(cdl_objects::Error),
 }
 
 pub enum Msg {
     SuccessfulFetch(Vec<CDLSchemaDefinition>),
-    Error(String),
+    Error(cdl_objects::Error),
 }
 
 impl Component for SchemaRegistryHistory {

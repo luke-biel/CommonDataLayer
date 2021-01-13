@@ -1,3 +1,5 @@
+use crate::cdl_objects;
+use crate::cdl_objects::Error;
 use graphql_client::GraphQLQuery;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -12,11 +14,6 @@ use uuid::Uuid;
 pub struct UpdateTopicMut;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct CDLResponse {
-    data: CDLUpdateSchemaData,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
 struct CDLUpdateSchemaData {
     #[serde(rename = "updateSchema")]
     update_schema: CDLUpdateTopic,
@@ -28,19 +25,11 @@ pub struct CDLUpdateTopic {
 }
 
 impl UpdateTopicMut {
-    pub async fn fetch(endpoint: Url, id: Uuid, topic: String) -> Result<String, String> {
+    pub async fn fetch(endpoint: Url, id: Uuid, topic: String) -> Result<String, Error> {
         let query = UpdateTopicMut::build_query(update_topic_mut::Variables { id, topic });
 
-        let response: CDLResponse = reqwest::Client::new()
-            .post(endpoint)
-            .json(&query)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?
-            .json()
-            .await
-            .map_err(|e| e.to_string())?;
+        let response: CDLUpdateSchemaData = cdl_objects::query_graphql(endpoint, &query).await?;
 
-        Ok(response.data.update_schema.topic)
+        Ok(response.update_schema.topic)
     }
 }

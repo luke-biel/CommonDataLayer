@@ -1,5 +1,5 @@
 use crate::cdl_objects::all_schemas::{AllSchemasQuery, CDLSchemaData};
-use crate::GRAPHQL_URL;
+use crate::{cdl_objects, GRAPHQL_URL};
 use yew::prelude::*;
 use yewtil::future::LinkFuture;
 
@@ -18,14 +18,14 @@ pub struct SchemaRegistryList {
 
 pub enum Msg {
     SuccessfulFetch(CDLSchemaData),
-    Error(String),
+    Error(cdl_objects::Error),
     OpenAdd,
 }
 
 pub enum State {
     Fetching,
     List(CDLSchemaData),
-    Error(String),
+    Error(cdl_objects::Error),
 }
 
 impl Component for SchemaRegistryList {
@@ -51,7 +51,7 @@ impl Component for SchemaRegistryList {
         match msg {
             Msg::SuccessfulFetch(schemas) => self.state = State::List(schemas),
             Msg::Error(error) => self.state = State::Error(error),
-            Msg::OpenAdd => self.dispatcher.send(Request::Open(Page::AddSchema)),
+            Msg::OpenAdd => self.dispatcher.send(Request::Send(Page::AddSchema)),
         }
 
         true
