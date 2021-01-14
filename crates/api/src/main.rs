@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 pub mod config;
 pub mod context;
 pub mod error;
@@ -8,6 +6,7 @@ pub mod schema;
 
 use config::Config;
 use context::Context;
+use std::sync::Arc;
 use structopt::StructOpt;
 use warp::{http::Response, hyper::header::CONTENT_TYPE, hyper::Method, Filter};
 
