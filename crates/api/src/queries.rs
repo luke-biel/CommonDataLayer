@@ -17,16 +17,53 @@ pub fn schema() -> GQLSchema {
     GQLSchema::new(Query, QueryMut, Subscription)
 }
 
-type EventStream = Pin<Box<dyn Stream<Item = FieldResult<KafkaEvent>> + Send>>;
+type ReportStream = Pin<Box<dyn Stream<Item = FieldResult<Report>> + Send>>;
 
 pub struct Subscription;
 
 #[graphql_subscription(context = Context)]
 impl Subscription {
-    async fn kafka_events(context: &Context, topic: String) -> EventStream {
-        log::debug!("subscribe on kafka topic {}", topic);
-        let stream = context.consume_kafka_topic(topic).await?.err_into();
+    async fn reports(context: &Context) -> ReportStream {
+        let topic = &context.config().report_topic;
+        let stream = context
+            .subscribe_on_kafka_topic(topic)
+            .await?
+            .try_filter_map(|ev| async move { Ok(ev.payload) })
+            .map_err(anyhow::Error::from)
+            .and_then(|payload| async move {
+                serde_json::from_str(&payload).map_err(|e| anyhow::Error::from(e))
+            })
+            .err_into();
+
         Box::pin(stream)
+    }
+}
+
+#[graphql_object(context = Context)]
+impl Report {
+    /// Application which generated the report
+    fn application(&self) -> &str {
+        &self.application
+    }
+
+    /// Output plugin in command service
+    fn output_plugin(&self) -> Option<&str> {
+        self.output_plugin.as_deref()
+    }
+
+    /// Success/Failure
+    fn description(&self) -> &str {
+        &self.description
+    }
+
+    /// Object id
+    fn object_id(&self) -> &Uuid {
+        &self.object_id
+    }
+
+    /// JSON encoded payload
+    fn payload(&self) -> FieldResult<String> {
+        Ok(serde_json::to_string(&self.payload)?)
     }
 }
 

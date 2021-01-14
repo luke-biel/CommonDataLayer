@@ -11,6 +11,9 @@ pub struct Config {
 
     #[structopt(flatten)]
     pub kafka: KafkaConfig,
+
+    #[structopt(long = "report-topic", env = "REPORT_TOPIC")]
+    pub report_topic: String,
 }
 
 #[derive(StructOpt)]

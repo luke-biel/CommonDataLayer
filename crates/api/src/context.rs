@@ -23,30 +23,33 @@ impl Context {
         }
     }
 
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
     pub async fn connect_to_registry(&self) -> Result<SchemaRegistryConn, Error> {
         // TODO: Make proper connection pool
         let new_conn = rpc::schema_registry::connect(self.config.registry_addr.clone()).await?;
         Ok(new_conn)
     }
 
-    pub async fn consume_kafka_topic(&self, topic: String) -> Result<EventStream, Error> {
-        let consumer = self
-            .consume_kafka_topic_inner(topic)
+    pub async fn subscribe_on_kafka_topic(&self, topic: &str) -> Result<EventStream, Error> {
+        log::debug!("subscribe on kafka topic {}", topic);
+        self.consume_kafka_topic_inner(topic)
             .await
-            .map_err(|e| Error::KafkaClientError(format!("{:?}", e)));
-        consumer
+            .map_err(|e| Error::KafkaClientError(format!("{:?}", e)))
     }
 
-    async fn consume_kafka_topic_inner(&self, topic: String) -> Result<EventStream, anyhow::Error> {
+    async fn consume_kafka_topic_inner(&self, topic: &str) -> Result<EventStream, anyhow::Error> {
         let mut event_map = self.kafka_events.lock().await;
-        match event_map.get(&topic) {
+        match event_map.get(topic) {
             Some(subscriber) => {
                 let stream = subscriber.subscribe();
                 Ok(stream)
             }
             None => {
-                let (subscriber, stream) = EventSubscriber::new(&self.config.kafka, &topic)?;
-                event_map.insert(topic, subscriber);
+                let (subscriber, stream) = EventSubscriber::new(&self.config.kafka, topic)?;
+                event_map.insert(topic.to_string(), subscriber);
                 Ok(stream)
             }
         }

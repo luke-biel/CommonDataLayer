@@ -1,4 +1,9 @@
-use crate::{config::KafkaConfig, schema::KafkaEvent};
+/// We are using tokio::sync::broadcast to support multiple connections via WebSocket.
+/// The idea is, that if two clients ask for the same stream of data, you don't wanna query it twice.
+/// Instead you listen on different task (See: `tokio::spawn` in `EventSubscriber::new`) and then send message to broadcast channel.
+/// Each websocket client has its own Receiver.
+/// Thanks to that we are not only reusing connection, but also limit dangerous `consumer.leak()` usage.
+use crate::config::KafkaConfig;
 use anyhow::Context as _Context;
 use futures::task::{Context as FutCtx, Poll};
 use futures::{Stream, StreamExt, TryStreamExt};
@@ -11,6 +16,15 @@ use std::pin::Pin;
 use thiserror::Error;
 use tokio::sync::broadcast;
 
+// TODO: Probably could be replaced by OwnedMessage from kafkard?
+/// Owned generic message received from kafka.
+#[derive(Clone, Debug)]
+pub struct KafkaEvent {
+    pub key: Option<String>,
+    pub payload: Option<String>,
+}
+
+/// Wrapper to prevent accidental sending data to channel. `Sender` is used only for subscription mechanism
 pub struct EventSubscriber(broadcast::Sender<Result<KafkaEvent, KafkaError>>);
 
 #[derive(Error, Debug)]
@@ -21,12 +35,16 @@ pub enum EventError {
     Kafka(#[from] KafkaError),
 }
 
+// We are using Box<dyn> approach (recommended) by Tokio maintainers,
+// as unfortunately `broadcast::Receiver` doesn't implement `Stream` trait,
+// and it is hard to achieve it without major refactor. Therefore we are using `async_stream` as a loophole.
 pub struct EventStream {
     inner: Pin<Box<dyn Stream<Item = Result<KafkaEvent, EventError>> + Send + Sync>>,
 }
 
 impl EventSubscriber {
-    pub fn new(config: &KafkaConfig, topic: &String) -> Result<(Self, EventStream), anyhow::Error> {
+    /// Connects to kafka and sends all messages to broadcast channel.
+    pub fn new(config: &KafkaConfig, topic: &str) -> Result<(Self, EventStream), anyhow::Error> {
         let (tx, rx) = broadcast::channel(32);
 
         log::debug!("Create new consumer for topic: {}", topic);
@@ -41,7 +59,7 @@ impl EventSubscriber {
             .create()
             .context("Consumer creation failed")?;
 
-        rdkafka::consumer::Consumer::subscribe(&consumer, &[topic.as_ref()])
+        rdkafka::consumer::Consumer::subscribe(&consumer, &[topic])
             .context("Can't subscribe to specified topics")?;
 
         let sink = tx.clone();
@@ -74,6 +92,7 @@ impl EventSubscriber {
         Ok((Self(tx), EventStream::new(rx)))
     }
 
+    /// Used by any client who wants to receive data from existing stream
     pub fn subscribe(&self) -> EventStream {
         EventStream::new(self.0.subscribe())
     }

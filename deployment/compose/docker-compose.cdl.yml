@@ -182,3 +182,4 @@ services:
       QUERY_ROUTER_ADDR: "http://query_router:50103"
       KAFKA_GROUP_ID: "cdl-api"
       KAFKA_BROKERS: "kafka:9093"
+      REPORT_TOPIC: "cdl.reports"
