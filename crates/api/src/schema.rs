@@ -43,6 +43,12 @@ pub struct View {
     pub expression: String,
 }
 
+#[derive(Clone, Debug, juniper::GraphQLObject)]
+pub struct KafkaEvent {
+    pub key: Option<String>,
+    pub payload: Option<String>,
+}
+
 /// Input object which creates new schema and new definition. Each schema has to contain at least one definition, which can be later overriden.
 #[derive(Debug, juniper::GraphQLInputObject)]
 pub struct NewSchema {

@@ -8,4 +8,23 @@ pub struct Config {
     pub query_router_addr: String,
     #[structopt(long = "input-port", env = "INPUT_PORT")]
     pub input_port: u16,
+
+    #[structopt(flatten)]
+    pub kafka: KafkaConfig,
+}
+
+#[derive(StructOpt)]
+pub struct KafkaConfig {
+    #[structopt(
+        long = "kafka-group-id",
+        env = "KAFKA_GROUP_ID",
+        default_value = "cdl-api"
+    )]
+    pub group_id: String,
+    #[structopt(
+        long = "kafka-brokers",
+        env = "KAFKA_BROKERS",
+        default_value = "localhost:9092"
+    )]
+    pub brokers: String,
 }

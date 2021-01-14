@@ -4,15 +4,30 @@ use crate::{
     context::{Context, SchemaRegistryConn},
     error::Error,
 };
-use juniper::{graphql_object, EmptySubscription, FieldResult, RootNode};
+use futures::{Stream, TryStreamExt};
+use juniper::{graphql_object, graphql_subscription, FieldResult, RootNode};
 use num_traits::{FromPrimitive, ToPrimitive};
 use rpc::schema_registry::Empty;
+use std::pin::Pin;
 use uuid::Uuid;
 
-pub type GQLSchema = RootNode<'static, Query, QueryMut, EmptySubscription<Context>>;
+pub type GQLSchema = RootNode<'static, Query, QueryMut, Subscription>;
 
 pub fn schema() -> GQLSchema {
-    GQLSchema::new(Query, QueryMut, EmptySubscription::new())
+    GQLSchema::new(Query, QueryMut, Subscription)
+}
+
+type EventStream = Pin<Box<dyn Stream<Item = FieldResult<KafkaEvent>> + Send>>;
+
+pub struct Subscription;
+
+#[graphql_subscription(context = Context)]
+impl Subscription {
+    async fn kafka_events(context: &Context, topic: String) -> EventStream {
+        log::debug!("subscribe on kafka topic {}", topic);
+        let stream = context.consume_kafka_topic(topic).await?.err_into();
+        Box::pin(stream)
+    }
 }
 
 pub struct QueryMut;
