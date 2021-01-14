@@ -9,6 +9,8 @@
 * cargo-make
 * wasm-pack
 
+* `api` and `schema-registry` instances running on localhost
+
 ### Running
 
 Run command `cargo make start` in `frontend/` directory.
