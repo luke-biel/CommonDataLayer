@@ -8,7 +8,7 @@
 
 * cargo-make
 * wasm-pack
-
+* npm (for `http-server` - `npm install http-server -g`)
 * `api` and `schema-registry` instances running on localhost
 
 ### Running
