@@ -7,7 +7,7 @@ COPY . /usr/src/mnemosyne
 
 RUN --mount=type=cache,mode=0755,target=/usr/local/cargo/registry \
     --mount=type=cache,mode=0755,target=/usr/src/cdl/target \
-    cargo make rebuild
+    cargo make pack
 
 FROM nginx:alpine
 
