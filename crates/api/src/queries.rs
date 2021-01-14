@@ -31,7 +31,7 @@ impl Subscription {
             .try_filter_map(|ev| async move { Ok(ev.payload) })
             .map_err(anyhow::Error::from)
             .and_then(|payload| async move {
-                serde_json::from_str(&payload).map_err(|e| anyhow::Error::from(e))
+                serde_json::from_str(&payload).map_err(anyhow::Error::from)
             })
             .err_into();
 
