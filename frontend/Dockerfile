@@ -2,8 +2,8 @@ FROM rust:latest as builder
 
 RUN cargo install cargo-make wasm-pack
 
-WORKDIR /usr/src/mnemosyne
-COPY . /usr/src/mnemosyne
+WORKDIR /usr/src/frontend
+COPY . /usr/src/frontend
 
 RUN --mount=type=cache,mode=0755,target=/usr/local/cargo/registry \
     --mount=type=cache,mode=0755,target=/usr/src/cdl/target \
@@ -11,4 +11,4 @@ RUN --mount=type=cache,mode=0755,target=/usr/local/cargo/registry \
 
 FROM nginx:alpine
 
-COPY --from=builder /usr/src/mnemosyne/www /usr/share/nginx/html
+COPY --from=builder /usr/src/frontend/www /usr/share/nginx/html

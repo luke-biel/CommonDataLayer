@@ -1,5 +1,5 @@
 [package]
-name = "mnemosyne"
+name = "frontend"
 authors = ["CDL Team"]
 version = "0.1.0"
 edition = "2018"

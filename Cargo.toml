@@ -1,7 +1,7 @@
 [workspace]
 members = [
   "crates/*",
-  "mnemosyne",
+  "frontend",
 ]
 
 [profile.release]
