@@ -2,6 +2,7 @@
 members = [
   "crates/*",
   "frontend",
+  "benchmarking"
 ]
 
 [profile.release]
