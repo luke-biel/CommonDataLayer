@@ -1,9 +1,11 @@
 pub mod config;
 pub mod context;
 pub mod error;
-pub mod events;
+pub mod kafka_events;
+pub mod metrics;
 pub mod queries;
 pub mod schema;
+pub mod subscriber;
 
 use std::sync::Arc;
 

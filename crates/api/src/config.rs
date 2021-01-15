@@ -14,6 +14,18 @@ pub struct Config {
 
     #[structopt(long = "report-topic", env = "REPORT_TOPIC")]
     pub report_topic: String,
+
+    #[structopt(long = "metrics-interval-sec", env = "METRICS_INTERVAL_SEC")]
+    pub metrics_interval_sec: u64,
+
+    #[structopt(long = "schema-registry-metrics", env = "SCHEMA_REGISTRY_METRICS")]
+    pub registry_metrics: String,
+
+    #[structopt(long = "data-router-metrics", env = "DATA_ROUTER_METRICS")]
+    pub data_router_metrics: String,
+
+    #[structopt(long = "postgres-command-metrics", env = "POSTGRES_COMMAND_METRICS")]
+    pub postgres_command_metrics: String,
 }
 
 #[derive(StructOpt)]

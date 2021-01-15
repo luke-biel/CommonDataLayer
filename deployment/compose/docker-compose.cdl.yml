@@ -183,3 +183,7 @@ services:
       KAFKA_GROUP_ID: "cdl-api"
       KAFKA_BROKERS: "kafka:9093"
       REPORT_TOPIC: "cdl.reports"
+      METRICS_INTERVAL_SEC: 5
+      SCHEMA_REGISTRY_METRICS: "http://schema_registry:51805/metrics"
+      DATA_ROUTER_METRICS: "http://data_router:51805/metrics"
+      POSTGRES_COMMAND_METRICS: "http://postgres_command:51805/metrics"

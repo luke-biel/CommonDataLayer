@@ -1,5 +1,5 @@
-use crate::error::Result;
 use crate::schema::*;
+use crate::{context::MetricsSource, error::Result};
 use crate::{
     context::{Context, SchemaRegistryConn},
     error::Error,
@@ -18,6 +18,7 @@ pub fn schema() -> GQLSchema {
 }
 
 type ReportStream = Pin<Box<dyn Stream<Item = FieldResult<Report>> + Send>>;
+type MetricsStream = Pin<Box<dyn Stream<Item = FieldResult<String>> + Send>>;
 
 pub struct Subscription;
 
@@ -33,6 +34,37 @@ impl Subscription {
             .and_then(|payload| async move {
                 serde_json::from_str(&payload).map_err(anyhow::Error::from)
             })
+            .err_into();
+
+        Box::pin(stream)
+    }
+
+    //TODO: Find a way to pass enum as an input object
+    async fn schema_registry_metrics(context: &Context) -> MetricsStream {
+        let stream = context
+            .subscribe_on_metrics(MetricsSource::SchemaRegistry)
+            .await?
+            .map_err(anyhow::Error::from)
+            .err_into();
+
+        Box::pin(stream)
+    }
+
+    async fn data_router_metrics(context: &Context) -> MetricsStream {
+        let stream = context
+            .subscribe_on_metrics(MetricsSource::DataRouter)
+            .await?
+            .map_err(anyhow::Error::from)
+            .err_into();
+
+        Box::pin(stream)
+    }
+
+    async fn postgres_command_metrics(context: &Context) -> MetricsStream {
+        let stream = context
+            .subscribe_on_metrics(MetricsSource::PostgresCommand)
+            .await?
+            .map_err(anyhow::Error::from)
             .err_into();
 
         Box::pin(stream)

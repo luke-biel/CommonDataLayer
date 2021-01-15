@@ -110,6 +110,7 @@ dependencies = [
  "num-derive",
  "num-traits",
  "rdkafka",
+ "reqwest",
  "rpc",
  "serde",
  "serde_json",
