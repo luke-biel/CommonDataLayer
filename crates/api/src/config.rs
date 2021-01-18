@@ -4,27 +4,27 @@ use structopt::StructOpt;
 pub struct Config {
     #[structopt(long = "schema-registry-addr", env = "SCHEMA_REGISTRY_ADDR")]
     pub registry_addr: String,
-    #[structopt(long = "query-router-addr", env = "QUERY_ROUTER_ADDR")]
+    #[structopt(long, env)]
     pub query_router_addr: String,
-    #[structopt(long = "input-port", env = "INPUT_PORT")]
+    #[structopt(long, env)]
     pub input_port: u16,
 
     #[structopt(flatten)]
     pub kafka: KafkaConfig,
 
-    #[structopt(long = "report-topic", env = "REPORT_TOPIC")]
+    #[structopt(long, env)]
     pub report_topic: String,
 
-    #[structopt(long = "metrics-interval-sec", env = "METRICS_INTERVAL_SEC")]
+    #[structopt(long, env)]
     pub metrics_interval_sec: u64,
 
     #[structopt(long = "schema-registry-metrics", env = "SCHEMA_REGISTRY_METRICS")]
     pub registry_metrics: String,
 
-    #[structopt(long = "data-router-metrics", env = "DATA_ROUTER_METRICS")]
+    #[structopt(long, env)]
     pub data_router_metrics: String,
 
-    #[structopt(long = "postgres-command-metrics", env = "POSTGRES_COMMAND_METRICS")]
+    #[structopt(long, env)]
     pub postgres_command_metrics: String,
 }
 

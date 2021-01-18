@@ -3,7 +3,7 @@ use crate::{
     subscriber::{Subscriber, SubscriberStream},
 };
 use anyhow::Context as _Context;
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use rdkafka::{
     consumer::{DefaultConsumerContext, StreamConsumer},
     error::KafkaError,
@@ -27,7 +27,7 @@ impl KafkaEventSubscriber {
         config: &KafkaConfig,
         topic: &str,
     ) -> Result<(Self, KafkaEventStream), anyhow::Error> {
-        let (inner, stream) = Subscriber::new(|sink| {
+        let (inner, stream) = Subscriber::new("kafka", || {
             log::debug!("Create new consumer for topic: {}", topic);
 
             let consumer: StreamConsumer<DefaultConsumerContext> = ClientConfig::new()
@@ -44,30 +44,19 @@ impl KafkaEventSubscriber {
                 .context("Can't subscribe to specified topics")?;
 
             let consumer = Box::leak(Box::new(consumer));
-            tokio::spawn(async move {
-                let stream = consumer.start().map_ok(move |msg| {
-                    let key = msg
-                        .key()
-                        .and_then(|s| std::str::from_utf8(s).ok())
-                        .map(|s| s.to_string());
-                    let payload = msg
-                        .payload()
-                        .and_then(|s| std::str::from_utf8(s).ok())
-                        .map(|s| s.to_string());
-                    KafkaEvent { key, payload }
-                });
-
-                tokio::pin!(stream);
-
-                while let Some(item) = stream.next().await {
-                    // Error means there are no active receivers.
-                    // In that case we skip info and wait patiently until someone arrives
-                    // Therefore `let _`
-                    let _ = sink.send(item);
-                }
-                log::warn!("Kafka stream has ended");
+            let stream = consumer.start().map_ok(move |msg| {
+                let key = msg
+                    .key()
+                    .and_then(|s| std::str::from_utf8(s).ok())
+                    .map(|s| s.to_string());
+                let payload = msg
+                    .payload()
+                    .and_then(|s| std::str::from_utf8(s).ok())
+                    .map(|s| s.to_string());
+                KafkaEvent { key, payload }
             });
-            Ok(())
+
+            Ok(stream)
         })?;
 
         Ok((Self(inner), stream))

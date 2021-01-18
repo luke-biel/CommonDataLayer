@@ -1,10 +1,13 @@
+use futures::Stream;
 /// We are using tokio::sync::broadcast to support multiple connections via WebSocket.
 /// The idea is, that if two clients ask for the same stream of data, you don't wanna query it twice.
 /// Instead you listen on different task (See: `tokio::spawn` in `EventSubscriber::new`) and then send message to broadcast channel.
 /// Each websocket client has its own Receiver.
 /// Thanks to that we are not only reusing connection, but also limit dangerous `consumer.leak()` usage.
-use futures::task::{Context, Poll};
-use futures::Stream;
+use futures::{
+    task::{Context, Poll},
+    StreamExt,
+};
 use std::fmt::{Debug, Display};
 use std::pin::Pin;
 use thiserror::Error;
@@ -40,13 +43,26 @@ where
     E: Debug + Display + Clone + Unpin + Send + Sync + 'static,
     T: Send + Sync + Clone + Unpin + Send + Sync + 'static,
 {
-    pub fn new(
-        consume: impl Fn(broadcast::Sender<Result<T, E>>) -> Result<(), anyhow::Error>,
-    ) -> Result<(Self, SubscriberStream<T, E>), anyhow::Error> {
+    pub fn new<F, S>(
+        name: &'static str,
+        mut consume: F,
+    ) -> Result<(Self, SubscriberStream<T, E>), anyhow::Error>
+    where
+        F: FnMut() -> Result<S, anyhow::Error>,
+        S: Stream<Item = Result<T, E>> + Send + 'static,
+    {
         let (tx, rx) = broadcast::channel(32);
         let sink = tx.clone();
 
-        consume(sink)?;
+        let stream = consume()?;
+
+        tokio::spawn(async move {
+            tokio::pin!(stream);
+            while let Some(item) = stream.next().await {
+                sink.send(item).ok();
+            }
+            log::warn!("{} stream has ended", name);
+        });
 
         Ok((Self(tx), SubscriberStream::new(rx)))
     }
