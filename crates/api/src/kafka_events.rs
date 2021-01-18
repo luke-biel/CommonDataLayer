@@ -25,9 +25,10 @@ impl KafkaEventSubscriber {
     /// Connects to kafka and sends all messages to broadcast channel.
     pub fn new(
         config: &KafkaConfig,
+        capacity: usize,
         topic: &str,
     ) -> Result<(Self, KafkaEventStream), anyhow::Error> {
-        let (inner, stream) = Subscriber::new("kafka", || {
+        let (inner, stream) = Subscriber::new("kafka", capacity, || {
             log::debug!("Create new consumer for topic: {}", topic);
 
             let consumer: StreamConsumer<DefaultConsumerContext> = ClientConfig::new()

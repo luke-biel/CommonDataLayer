@@ -9,6 +9,9 @@ pub struct Config {
     #[structopt(long, env)]
     pub input_port: u16,
 
+    #[structopt(long, env, default_value = "32")]
+    pub subscriptions_capacity: usize,
+
     #[structopt(flatten)]
     pub kafka: KafkaConfig,
 

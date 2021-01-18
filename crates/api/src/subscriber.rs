@@ -33,7 +33,7 @@ where
 pub struct SubscriberStream<T, E>
 where
     E: Debug + Display + Clone + Unpin + Send + Sync + 'static,
-    T: Send + Sync + Clone + Unpin + Send + Sync + 'static,
+    T: Clone + Unpin + Send + Sync + 'static,
 {
     inner: Pin<Box<dyn Stream<Item = Result<T, SubscriberError<E>>> + Send + Sync>>,
 }
@@ -41,17 +41,18 @@ where
 impl<T, E> Subscriber<T, E>
 where
     E: Debug + Display + Clone + Unpin + Send + Sync + 'static,
-    T: Send + Sync + Clone + Unpin + Send + Sync + 'static,
+    T: Clone + Unpin + Send + Sync + 'static,
 {
     pub fn new<F, S>(
         name: &'static str,
+        capacity: usize,
         mut consume: F,
     ) -> Result<(Self, SubscriberStream<T, E>), anyhow::Error>
     where
         F: FnMut() -> Result<S, anyhow::Error>,
         S: Stream<Item = Result<T, E>> + Send + 'static,
     {
-        let (tx, rx) = broadcast::channel(32);
+        let (tx, rx) = broadcast::channel(capacity);
         let sink = tx.clone();
 
         let stream = consume()?;
@@ -76,7 +77,7 @@ where
 impl<T, E> SubscriberStream<T, E>
 where
     E: Debug + Display + Clone + Unpin + Send + Sync + 'static,
-    T: Send + Sync + Clone + Unpin + Send + Sync + 'static,
+    T: Clone + Unpin + Send + Sync + 'static,
 {
     fn new(mut rx: broadcast::Receiver<Result<T, E>>) -> Self {
         let stream = async_stream::try_stream! {
@@ -97,7 +98,7 @@ where
 impl<T, E> Stream for SubscriberStream<T, E>
 where
     E: Debug + Display + Clone + Unpin + Send + Sync + 'static,
-    T: Send + Sync + Clone + Unpin + Send + Sync + 'static,
+    T: Clone + Unpin + Send + Sync + 'static,
 {
     type Item = Result<T, SubscriberError<E>>;
 

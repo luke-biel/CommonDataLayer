@@ -12,8 +12,12 @@ pub type MetricsStream = SubscriberStream<Metrics, Error>;
 
 impl MetricsSubscriber {
     /// Connects to kafka and sends all messages to broadcast channel.
-    pub fn new(source: &str, interval: Duration) -> Result<(Self, MetricsStream), anyhow::Error> {
-        let (inner, stream) = Subscriber::new("metrics", move || {
+    pub fn new(
+        source: &str,
+        capacity: usize,
+        interval: Duration,
+    ) -> Result<(Self, MetricsStream), anyhow::Error> {
+        let (inner, stream) = Subscriber::new("metrics", capacity, move || {
             let source = Arc::new(String::from(source));
             let source = futures::stream::unfold(source, |s| async move { Some((s.clone(), s)) });
             let stream = tokio::time::interval(interval)

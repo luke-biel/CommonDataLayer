@@ -83,6 +83,7 @@ impl Context {
                 let interval = self.config.metrics_interval_sec;
                 let (subscriber, stream) = MetricsSubscriber::new(
                     source_addr,
+                    self.config.subscriptions_capacity,
                     tokio::time::Duration::from_secs(interval),
                 )?;
                 event_map.insert(source, subscriber);
@@ -99,7 +100,11 @@ impl Context {
         match event_map.get(topic) {
             Some(subscriber) => Ok(subscriber.subscribe()),
             None => {
-                let (subscriber, stream) = KafkaEventSubscriber::new(&self.config.kafka, topic)?;
+                let (subscriber, stream) = KafkaEventSubscriber::new(
+                    &self.config.kafka,
+                    self.config.subscriptions_capacity,
+                    topic,
+                )?;
                 event_map.insert(topic.to_string(), subscriber);
                 Ok(stream)
             }
