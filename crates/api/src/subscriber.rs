@@ -1,7 +1,7 @@
 use futures::Stream;
 /// We are using tokio::sync::broadcast to support multiple connections via WebSocket.
 /// The idea is, that if two clients ask for the same stream of data, you don't wanna query it twice.
-/// Instead you listen on different task (See: `tokio::spawn` in `EventSubscriber::new`) and then send message to broadcast channel.
+/// Instead you listen on different task (See: `tokio::spawn`) and then send message to broadcast channel.
 /// Each websocket client has its own Receiver.
 /// Thanks to that we are not only reusing connection, but also limit dangerous `consumer.leak()` usage.
 use futures::{
@@ -28,7 +28,7 @@ where
 }
 
 // We are using Box<dyn> approach (recommended) by Tokio maintainers,
-// as unfortunately `broadcast::Receiver` doesn't implement `Stream` trait,
+// as unfortunately `broadcast::Receiver` doesn't implement `Stream` trait (it does implement in 0.x, but it has been removed for 1.x),
 // and it is hard to achieve it without major refactor. Therefore we are using `async_stream` as a loophole.
 pub struct SubscriberStream<T, E>
 where
@@ -59,9 +59,11 @@ where
 
         tokio::spawn(async move {
             tokio::pin!(stream);
+
             while let Some(item) = stream.next().await {
                 sink.send(item).ok();
             }
+
             log::warn!("{} stream has ended", name);
         });
 
