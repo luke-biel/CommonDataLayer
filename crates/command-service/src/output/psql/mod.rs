@@ -2,7 +2,7 @@ use std::time;
 
 use crate::communication::resolution::Resolution;
 use crate::output::OutputPlugin;
-use bb8::Pool;
+use bb8::{Pool, PooledConnection};
 use bb8_postgres::tokio_postgres::types::Json;
 use bb8_postgres::tokio_postgres::{Config, NoTls};
 use bb8_postgres::PostgresConnectionManager;
@@ -60,7 +60,7 @@ impl OutputPlugin for PostgresOutputPlugin {
 
         trace!("Storing message {:?}", msg);
 
-        let payload: Value = match serde_json::from_str(&msg.data.get()) {
+        let payloads: Vec<Value> = match serde_json::from_str(&msg.data.get()) {
             Ok(json) => json,
             Err(_err) => return Resolution::CommandServiceFailure,
         };
@@ -70,9 +70,29 @@ impl OutputPlugin for PostgresOutputPlugin {
             &self.schema
         );
 
-        let store_result = connection
+        match insert_transaction(connection, msg, &store_query, payloads).await {
+            Ok(_) => Resolution::Success,
+            Err(description) => Resolution::StorageLayerFailure { description },
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "PostgreSQL"
+    }
+}
+
+async fn insert_transaction(
+    mut connection: PooledConnection<'_, PostgresConnectionManager<NoTls>>,
+    msg: BorrowedInsertMessage<'_>,
+    store_query: &str,
+    payloads: Vec<Value>,
+) -> Result<(), String> {
+    let transaction = connection.transaction().await.map_err(|e| e.to_string())?;
+
+    for payload in payloads {
+        let store_result = transaction
             .query(
-                store_query.as_str(),
+                store_query,
                 &[
                     &msg.object_id,
                     &msg.timestamp,
@@ -83,20 +103,13 @@ impl OutputPlugin for PostgresOutputPlugin {
             .await;
 
         trace!("PSQL `INSERT` {:?}", store_result);
-
-        match store_result {
-            Ok(_) => {
-                counter!("cdl.command-service.store.psql", 1);
-
-                Resolution::Success
-            }
-            Err(err) => Resolution::StorageLayerFailure {
-                description: err.to_string(),
-            },
-        }
+        store_result.map_err(|e| e.to_string())?;
+        counter!("cdl.command-service.store.psql", 1);
     }
 
-    fn name(&self) -> &'static str {
-        "PostgreSQL"
-    }
+    transaction
+        .commit()
+        .await
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
