@@ -11,7 +11,7 @@ use std::{
 };
 use structopt::{clap::arg_enum, StructOpt};
 use tokio::pin;
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 use utils::{
     abort_on_poison,
     message_types::BorrowedInsertMessage,

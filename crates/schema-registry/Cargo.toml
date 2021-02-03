@@ -34,8 +34,9 @@ semver      = { version = "0.11", features = ["serde"] }
 serde       = { version = "1.0", features = ["derive"] }
 serde_json  = "1.0"
 thiserror   = "1.0"
-tokio       = { version = "0.2", features = ["macros"] }
 tonic       = "0.3"
 url         = "2.1"
 uuid        = { version = "0.8", features = ["v1", "serde"] }
 chrono      = "0.4.19"
+tokio       = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio-stream            = "0.1"

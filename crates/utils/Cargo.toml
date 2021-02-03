@@ -24,7 +24,7 @@ serde       = { version = "1.0", features = ["derive"] }
 serde_json  = { version = "1.0", features = ["raw_value"] }
 structopt   = "0.3"
 thiserror   = "1.0"
-tokio       = { version = "0.2", features = ["rt-core"] }
+tokio       = { version = "1", features = ["rt-multi-thread"] }
 tokio-amqp  = "0.1"
 uuid        = { version = "0.8", features = ["v1", "serde"] }
 async-stream            = "0.3"

@@ -10,7 +10,7 @@ use utils::messaging_system::publisher::CommonPublisher;
 pub async fn replicate_db_events(
     config: MessageQueueConfig,
     recv: mpsc::Receiver<ReplicationEvent>,
-    tokio_runtime: Handle,
+    runtime: Handle,
     mut kill_signal: oneshot::Receiver<()>,
 ) {
     let producer = match &config.queue {
@@ -33,9 +33,7 @@ pub async fn replicate_db_events(
             return;
         };
 
-        tokio_runtime.enter(|| {
-            send_messages_to_kafka(producer.clone(), config.topic_or_exchange.clone(), event)
-        });
+        send_messages_to_kafka(producer.clone(), config.topic_or_exchange.clone(), event, &runtime);
     }
 }
 
@@ -43,6 +41,7 @@ fn send_messages_to_kafka(
     producer: Arc<CommonPublisher>,
     topic_or_exchange: String,
     event: ReplicationEvent,
+    runtime: &Handle,
 ) {
     let key = match &event {
         ReplicationEvent::AddSchema { id, .. } => id,
@@ -53,7 +52,8 @@ fn send_messages_to_kafka(
     };
     let serialized = serde_json::to_string(&event).unwrap();
     let serialized_key = key.to_string();
-    tokio::spawn(async move {
+
+    runtime.spawn(async move {
         let delivery_status = producer.publish_message(
             &topic_or_exchange,
             &serialized_key,

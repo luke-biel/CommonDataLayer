@@ -55,7 +55,7 @@ impl LeaderElector {
         let client_api = Client::try_default().await?;
         let pods: Api<Pod> = Api::namespaced(client_api, &self.namespace);
         loop {
-            tokio::time::delay_for(self.heartbeat_time).await;
+            tokio::time::sleep(self.heartbeat_time).await;
 
             let heartbeat = match self.election_type {
                 LeaderElectorType::Schema => schema_heartbeat(&self.master_addr, self.port).await,
