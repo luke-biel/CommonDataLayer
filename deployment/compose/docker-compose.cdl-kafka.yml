@@ -238,3 +238,4 @@ services:
       KAFKA_BROKERS: "kafka:9093"
       KAFKA_GROUP_ID: "cdl-api"
       REPORT_TOPIC_OR_QUEUE: "cdl.reports"
+      DATA_ROUTER_TOPIC_OR_EXCHANGE: "cdl.data.input"

@@ -171,7 +171,7 @@ impl Mutation {
 
         publisher
             .publish_message(
-                &context.config().data_router_topic_or_queue,
+                &context.config().data_router_topic_or_exchange,
                 &message.object_id.to_string(),
                 payload,
             )
@@ -197,7 +197,7 @@ impl Mutation {
 
             publisher
                 .publish_message(
-                    &context.config().data_router_topic_or_queue,
+                    &context.config().data_router_topic_or_exchange,
                     &message.object_id.to_string(),
                     payload,
                 )

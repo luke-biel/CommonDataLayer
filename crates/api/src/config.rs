@@ -16,7 +16,7 @@ pub struct Config {
     #[structopt(long, env)]
     pub report_topic_or_queue: String,
     #[structopt(long, env)]
-    pub data_router_topic_or_queue: String,
+    pub data_router_topic_or_exchange: String,
 }
 
 #[derive(StructOpt)]
