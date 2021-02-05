@@ -165,6 +165,7 @@ impl Mutation {
             object_id: message.object_id,
             schema_id: message.schema_id,
             order_group_id: None,
+            version: utils::message_types::CURRENT_VERSION,
             data: &RawValue::from_string(message.payload)?,
         })?;
 
@@ -190,6 +191,7 @@ impl Mutation {
                 object_id: message.object_id,
                 schema_id: message.schema_id,
                 order_group_id: Some(order_group_id),
+                version: utils::message_types::CURRENT_VERSION,
                 data: &RawValue::from_string(message.payload)?,
             })?;
 

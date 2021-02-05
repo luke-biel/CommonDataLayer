@@ -260,6 +260,14 @@ async fn route(
     producer: &CommonPublisher,
     schema_registry_addr: &str,
 ) -> anyhow::Result<()> {
+    if event.version < utils::message_types::CURRENT_VERSION {
+        anyhow::bail!(
+            "Insert message is obsolete (v{} < v{})",
+            event.version,
+            utils::message_types::CURRENT_VERSION
+        );
+    }
+
     let payload = BorrowedInsertMessage {
         object_id: event.object_id,
         order_group_id: event.order_group_id,
