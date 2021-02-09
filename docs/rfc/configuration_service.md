@@ -58,12 +58,14 @@ Schema-less environments (eg. no validator) still rely on schema-registry.
 ### Schema registry
 `schema-registry` would serve only schemas and views. It's structure would be changed as follows:
 
-* `schema_id` }|-- `schema_definition(version, json_schema)`
+* `schema_id` }|-- `schema_definition(version, json_schema, repository_type)`
 * `view_id` }|-- `view_definition(version, jmespath)`
 * `view_definition` }|-- `(schema_id, version)`
 
 
 Structure assumes existence of `data-materializer`, and when `data-materializer` would be introduced this structure can change.
+`repository_type` refers to distinction between `TIMESERIES` and `DOCUMENT_STORAGE`, 
+and is necessary when validating payloads, as different kinds of repositories have slightly different message formats.
 
 ### Configuration Service
 `configuration-service` would replace `SR` functionality of serving repository metadata.
