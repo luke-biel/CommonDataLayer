@@ -107,4 +107,4 @@ during each upgrade or when `DR` changelog explicitly states bump of `MAJOR` num
 # Tasks and timeline
 TBD
 
-[data-router-readme]: /docs/data_router.md
+[data-router-readme]: ../data_router.md
