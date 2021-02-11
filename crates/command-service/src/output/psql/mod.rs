@@ -11,7 +11,9 @@ pub use error::Error;
 use log::{error, trace};
 use serde_json::Value;
 use utils::message_types::BorrowedInsertMessage;
-use utils::{metrics::counter, psql::validate_schema};
+use utils::metrics::metrics::counter;
+use utils::metrics::*;
+use utils::psql::validate_schema;
 
 pub mod config;
 pub mod error;
@@ -86,7 +88,7 @@ impl OutputPlugin for PostgresOutputPlugin {
 
         match store_result {
             Ok(_) => {
-                counter!("cdl.command-service.store.psql", 1);
+                counter!("cdl.command_service.store.psql", 1);
 
                 Resolution::Success
             }

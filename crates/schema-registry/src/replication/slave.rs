@@ -3,8 +3,8 @@ use crate::db::SchemaDb;
 use anyhow::Context;
 use log::{error, info, trace};
 use std::{process, sync::Arc};
-use tokio::stream::StreamExt;
 use tokio::{pin, sync::oneshot::Receiver};
+use tokio_stream::StreamExt;
 use utils::messaging_system::{
     consumer::CommonConsumer, consumer::CommonConsumerConfig, message::CommunicationMessage,
 };

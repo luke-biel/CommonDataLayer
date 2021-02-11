@@ -36,7 +36,7 @@ async fn spawn_server<Q: QueryServiceTs>(service: Q, port: u16) -> anyhow::Resul
 async fn main() -> anyhow::Result<()> {
     let config: Config = Config::from_args();
     env_logger::init();
-    metrics::serve();
+    metrics::setup_metrics()?;
 
     match config.inner {
         ConfigType::Victoria(victoria_config) => {

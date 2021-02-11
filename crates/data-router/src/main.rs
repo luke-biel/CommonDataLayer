@@ -10,14 +10,15 @@ use std::{
 };
 use structopt::{clap::arg_enum, StructOpt};
 use tokio::pin;
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
+use utils::metrics::metrics::counter;
+use utils::metrics::*;
 use utils::{
     abort_on_poison,
     message_types::BorrowedInsertMessage,
     messaging_system::{
         consumer::CommonConsumer, message::CommunicationMessage, publisher::CommonPublisher,
     },
-    metrics::{self, counter},
 };
 use utils::{
     current_timestamp, message_types::DataRouterInsertMessage,
@@ -66,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
 
     debug!("Environment {:?}", config);
 
-    metrics::serve();
+    setup_metrics()?;
 
     let consumer = new_consumer(&config, &config.input_topic_or_queue).await?;
     let producer = Arc::new(new_producer(&config).await?);
@@ -103,7 +104,7 @@ async fn main() -> anyhow::Result<()> {
         };
     }
 
-    tokio::time::delay_for(tokio::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
     Ok(())
 }

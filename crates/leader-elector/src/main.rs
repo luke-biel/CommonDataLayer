@@ -2,7 +2,7 @@ use anyhow::Context;
 use futures::{Future, FutureExt};
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{DeleteParams, ListParams, Meta, PatchParams},
+    api::{DeleteParams, ListParams, Meta, Patch, PatchParams},
     Api, Client,
 };
 use log::{debug, info, warn};
@@ -57,7 +57,7 @@ impl LeaderElector {
         let client_api = Client::try_default().await?;
         let pods: Api<Pod> = Api::namespaced(client_api, &self.namespace);
         loop {
-            tokio::time::delay_for(self.heartbeat_time).await;
+            tokio::time::sleep(self.heartbeat_time).await;
 
             let heartbeat = match self.election_type {
                 LeaderElectorType::Schema => schema_heartbeat(&self.master_addr, self.port).await,
@@ -108,8 +108,12 @@ impl LeaderElector {
                 }
             }
         }))?;
-        pods.patch(&pod_name, &PatchParams::apply("Leader-elector"), patch)
-            .await?;
+        pods.patch(
+            &pod_name,
+            &PatchParams::apply("Leader-elector"),
+            &Patch::Apply(patch),
+        )
+        .await?;
         Ok(())
     }
 }

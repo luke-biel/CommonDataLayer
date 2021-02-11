@@ -10,7 +10,9 @@ use serde_json::Value;
 use std::collections::HashMap;
 use structopt::StructOpt;
 use tonic::{Request, Response, Status};
-use utils::{metrics::counter, psql::validate_schema};
+use utils::metrics::metrics::counter;
+use utils::metrics::*;
+use utils::psql::validate_schema;
 use uuid::Uuid;
 
 #[derive(Debug, StructOpt)]
@@ -134,7 +136,7 @@ impl QueryService for PsqlQuery {
 
         trace!("QueryMultiple: {:?}", request);
 
-        counter!("cdl.query-service.query-multiple.psql", 1);
+        counter!("cdl.query_service.query_multiple.psql", 1);
 
         let object_ids: Vec<Uuid> = request
             .object_ids
@@ -173,7 +175,7 @@ impl QueryService for PsqlQuery {
 
         trace!("QueryBySchema: {:?}", request);
 
-        counter!("cdl.query-service.query-by-schema.psql", 1);
+        counter!("cdl.query_service.query_by_schema.psql", 1);
 
         let schema_id = request
             .schema_id
@@ -202,7 +204,7 @@ impl QueryService for PsqlQuery {
         &self,
         request: Request<RawStatement>,
     ) -> Result<Response<ValueBytes>, Status> {
-        counter!("cdl.query-service.query_raw.psql", 1);
+        counter!("cdl.query_service.query_raw.psql", 1);
         let connection = self.connect().await?;
         let messages = connection
             .simple_query(request.into_inner().raw_statement.as_str())

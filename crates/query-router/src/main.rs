@@ -20,12 +20,12 @@ struct Config {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let config = Config::from_args();
 
-    metrics::serve();
+    metrics::setup_metrics()?;
 
     let schema_registry_cache = Arc::new(SchemaRegistryCache::new(
         config.schema_registry_addr,
@@ -62,4 +62,6 @@ async fn main() {
     warp::serve(routes)
         .run(([0, 0, 0, 0], config.input_port))
         .await;
+
+    Ok(())
 }

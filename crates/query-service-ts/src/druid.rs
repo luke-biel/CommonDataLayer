@@ -7,7 +7,8 @@ use rpc::query_service_ts::{
 use serde_json::{json, Value};
 use structopt::StructOpt;
 use tonic::{Request, Response, Status};
-use utils::metrics::counter;
+use utils::metrics::metrics::counter;
+use utils::metrics::*;
 
 #[derive(Debug, StructOpt)]
 pub struct DruidConfig {
@@ -19,7 +20,7 @@ pub struct DruidConfig {
 
 pub struct DruidConnectionManager;
 
-#[tonic::async_trait]
+#[async_trait::async_trait]
 impl bb8::ManageConnection for DruidConnectionManager {
     type Connection = Client;
     type Error = reqwest::Error;
@@ -28,8 +29,8 @@ impl bb8::ManageConnection for DruidConnectionManager {
         Ok(Client::new())
     }
 
-    async fn is_valid(&self, conn: Self::Connection) -> Result<Self::Connection, Self::Error> {
-        Ok(conn)
+    async fn is_valid(&self, _conn: &mut PooledConnection<'_, Self>) -> Result<(), Self::Error> {
+        Ok(())
     }
 
     fn has_broken(&self, _conn: &mut Self::Connection) -> bool {
@@ -100,7 +101,7 @@ impl QueryServiceTs for DruidQuery {
         &self,
         request: Request<Range>,
     ) -> Result<Response<TimeSeries>, Status> {
-        counter!("cdl.query-service.query-by-range.druid", 1);
+        counter!("cdl.query_service.query_by_range.druid", 1);
 
         let request = request.into_inner();
 
@@ -130,7 +131,7 @@ impl QueryServiceTs for DruidQuery {
         &self,
         request: Request<SchemaId>,
     ) -> Result<Response<TimeSeries>, Status> {
-        counter!("cdl.query-service.query-by-schema.druid", 1);
+        counter!("cdl.query_service.query_by_schema.druid", 1);
 
         let request = request.into_inner();
 
@@ -156,7 +157,7 @@ impl QueryServiceTs for DruidQuery {
         &self,
         request: Request<RawStatement>,
     ) -> Result<Response<ValueBytes>, Status> {
-        counter!("cdl.query-service.query-raw.druid", 1);
+        counter!("cdl.query_service.query_raw.druid", 1);
 
         let request = request.into_inner();
 

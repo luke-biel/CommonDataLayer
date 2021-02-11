@@ -10,7 +10,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::Duration;
 use utils::message_types::BorrowedInsertMessage;
-use utils::metrics::counter;
+use utils::metrics::metrics::counter;
+use utils::metrics::*;
 use uuid::Uuid;
 
 mod config;
@@ -74,7 +75,7 @@ impl OutputPlugin for DruidOutputPlugin {
                         description: err.to_string(),
                     }),
                     Ok(_) => {
-                        counter!("cdl.command-service.store.druid", 1);
+                        counter!("cdl.command_service.store.druid", 1);
                         Ok(Resolution::Success)
                     }
                 }

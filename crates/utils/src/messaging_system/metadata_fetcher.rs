@@ -1,7 +1,10 @@
 use std::time::Duration;
 
 use anyhow::Context;
-use rdkafka::{producer::BaseProducer, ClientConfig};
+use rdkafka::{
+    producer::{BaseProducer, Producer},
+    ClientConfig,
+};
 use tokio_amqp::LapinTokioExt;
 
 use super::Result;
@@ -14,7 +17,7 @@ pub enum MetadataFetcher {
 impl MetadataFetcher {
     pub async fn new_kafka(brokers: &str) -> Result<Self> {
         let producer = ClientConfig::new()
-            .set("bootstrap.servers", &brokers)
+            .set("bootstrap.servers", brokers)
             .create()
             .context("Metadata fetcher creation failed")?;
 

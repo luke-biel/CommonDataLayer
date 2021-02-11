@@ -34,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
 
     let config: Config = Config::from_args();
 
-    metrics::serve();
+    metrics::setup_metrics()?;
 
     match config.inner {
         ConfigType::Postgres(psql_config) => {

@@ -4,6 +4,7 @@ use crate::report::{Error, ReportSender};
 use log::trace;
 use std::sync::Arc;
 use utils::message_types::BorrowedInsertMessage;
+use utils::metrics::metrics::counter;
 use utils::metrics::*;
 
 pub mod config;

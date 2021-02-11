@@ -4,14 +4,15 @@ use crate::{
     input::Error,
 };
 use futures::stream::select_all;
-use futures::stream::StreamExt;
 use log::{error, trace};
 use std::{process, sync::Arc};
 use tokio::pin;
+use tokio_stream::StreamExt;
 use utils::messaging_system::consumer::CommonConsumer;
 use utils::messaging_system::message::CommunicationMessage;
 use utils::messaging_system::Result;
-use utils::metrics::counter;
+use utils::metrics::metrics::counter;
+use utils::metrics::*;
 use utils::task_limiter::TaskLimiter;
 use utils::{message_types::BorrowedInsertMessage, parallel_task_queue::ParallelTaskQueue};
 
@@ -55,7 +56,7 @@ impl<P: OutputPlugin> MessageQueueInput<P> {
         message: Result<Box<dyn CommunicationMessage>>,
         task_queue: Arc<ParallelTaskQueue>,
     ) -> Result<(), Error> {
-        counter!("cdl.command-service.input-request", 1);
+        counter!("cdl.command_service.input_request", 1);
         let message = message.map_err(Error::FailedReadingMessage)?;
 
         let generic_message = Self::build_message(message.as_ref())?;
@@ -119,7 +120,7 @@ impl<P: OutputPlugin> MessageQueueInput<P> {
         }
         trace!("Stream closed");
 
-        tokio::time::delay_for(tokio::time::Duration::from_secs(3)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
         Ok(())
     }

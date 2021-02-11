@@ -1,33 +1,17 @@
 use anyhow::Context;
-use log::debug;
-use metrics_runtime::Receiver;
-use std::net::{Ipv4Addr, SocketAddrV4};
+use metrics_exporter_prometheus::PrometheusBuilder;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-pub use metrics::{counter, gauge, timing, value};
+pub use metrics;
 
 const METRICS_PORT: u16 = 51805;
 
-pub fn serve() {
-    tokio::spawn(setup_metrics());
-}
-
-async fn setup_metrics() -> anyhow::Result<()> {
-    let metrics_receiver = Receiver::builder()
-        .build()
-        .context("failed to create receiver")?;
-    let controller = metrics_receiver.controller();
-    metrics_receiver.install();
-
-    let metrics_exporter = metrics_exporter_http::HttpExporter::new(
-        controller,
-        metrics_observer_prometheus::PrometheusBuilder::new(),
-        SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), METRICS_PORT).into(),
-    );
-
-    debug!("Initializing metrics at port {}", METRICS_PORT);
-
-    metrics_exporter
-        .async_run()
-        .await
-        .context("Failed to serve metrics")
+pub fn setup_metrics() -> anyhow::Result<()> {
+    PrometheusBuilder::new()
+        .listen_address(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+            METRICS_PORT,
+        ))
+        .install()
+        .context("failed to install Prometheus recorder")
 }

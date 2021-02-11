@@ -1,5 +1,6 @@
+use hyper::server::Server;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response, Server, StatusCode};
+use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use std::convert::Infallible;
 use std::sync::RwLock;

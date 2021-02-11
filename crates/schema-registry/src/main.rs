@@ -91,7 +91,7 @@ pub async fn main() -> anyhow::Result<()> {
     };
 
     status_endpoints::serve();
-    metrics::serve();
+    metrics::setup_metrics()?;
 
     let data_store = SledDatastore::new(&config.db_name).map_err(RegistryError::ConnectionError)?;
     let registry = SchemaRegistryImpl::new(

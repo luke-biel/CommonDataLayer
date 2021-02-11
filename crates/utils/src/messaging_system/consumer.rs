@@ -56,8 +56,8 @@ impl CommonConsumer {
 
     async fn new_kafka(group_id: &str, brokers: &str, topics: &[&str]) -> Result<Self> {
         let consumer: StreamConsumer<DefaultConsumerContext> = ClientConfig::new()
-            .set("group.id", &group_id)
-            .set("bootstrap.servers", &brokers)
+            .set("group.id", group_id)
+            .set("bootstrap.servers", brokers)
             .set("enable.partition.eof", "false")
             .set("session.timeout.ms", "6000")
             .set("enable.auto.commit", "false")
@@ -103,7 +103,7 @@ impl CommonConsumer {
         try_stream! {
             match self {
                 CommonConsumer::Kafka { consumer } => {
-                    let mut message_stream = consumer.start();
+                    let mut message_stream = consumer.stream();
                     while let Some(message) = message_stream.next().await {
                         let message = message?;
                         yield Box::new(KafkaCommunicationMessage{message,consumer:consumer.clone()}) as Box<dyn CommunicationMessage>;

@@ -11,7 +11,8 @@ use serde_json::Value;
 use thiserror::Error as DeriveError;
 use url::ParseError;
 use utils::message_types::BorrowedInsertMessage;
-use utils::metrics::counter;
+use utils::metrics::metrics::counter;
+use utils::metrics::*;
 use uuid::Uuid;
 
 pub mod config;
@@ -126,7 +127,7 @@ async fn send_data(url: Url, client: &Client, line_protocol: String) -> Resoluti
     match client.post(url).body(line_protocol).send().await {
         Ok(response) => {
             if matches!(response.status(), StatusCode::OK | StatusCode::NO_CONTENT) {
-                counter!("cdl.command-service.store.victoria_metrics", 1);
+                counter!("cdl.command_service.store.victoria_metrics", 1);
 
                 Resolution::Success
             } else {
