@@ -258,7 +258,7 @@ The main data to be stored is the definitions of the materialization to be done 
 should be recalculated. Views and Relations have already been defined above, so the following fields
 are for configuration of materialization frequency:
 
-      Field | Type | Description
+Field       | Type | Description
 -----------:|:----:|:-----------
 eager       | bool | whether to recalculate on every update
 minWaitTime | int  | minimum number of seconds to wait between updates
