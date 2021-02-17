@@ -1,14 +1,6 @@
 use anyhow::Context;
 use chrono::{DateTime, Utc};
-use indradb::SledDatastore;
-use rpc::schema_registry::schema_registry_server::SchemaRegistryServer;
-use schema_registry::{
-    error::RegistryError,
-    replication::AmqpConfig,
-    replication::MessageQueue,
-    replication::{KafkaConfig, MessageQueueConfig, ReplicationRole},
-    rpc::SchemaRegistryImpl,
-};
+use schema_registry::{error::RegistryError, rpc::SchemaRegistryImpl};
 use serde::Deserialize;
 use std::fs::File;
 use std::io::Write;
