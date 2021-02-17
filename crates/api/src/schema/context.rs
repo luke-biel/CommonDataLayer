@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{Context as _, Result};
-use rpc::schema_registry::schema_registry_client::SchemaRegistryClient;
-use rpc::tonic::transport::Channel;
 use tokio::sync::Mutex;
 use utils::messaging_system::publisher::CommonPublisher;
 
@@ -34,10 +32,9 @@ impl Context {
     }
 
     pub async fn connect_to_registry(&self) -> Result<SchemaRegistryConn> {
-        // TODO: Make proper connection pool
-        let new_conn =
-            rpc::schema_registry::connect(self.config.schema_registry_addr.clone()).await?;
-        Ok(new_conn)
+        schema_registry::db::SchemaRegistryConn::connect(&self.config.schema_registry_addr)
+            .await
+            .context("Failed to connect to the schema registry")
     }
 
     pub async fn subscribe_on_message_queue(&self, topic: &str) -> Result<EventStream> {

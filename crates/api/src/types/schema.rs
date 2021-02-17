@@ -1,25 +1,20 @@
 use num_derive::{FromPrimitive, ToPrimitive};
 use uuid::Uuid;
 
-#[derive(Debug)]
-/// Schema is the format in which data is to be sent to the Common Data Layer.
-pub struct Schema {
-    /// Random UUID assigned on creation
-    pub id: Uuid,
-    /// The name is not required to be unique among all schemas (as `id` is the identifier)
-    pub name: String,
-    /// Message queue topic to which data is inserted by data-router.
-    pub topic: String,
-    /// Address of the query service responsible for retrieving data from DB
-    pub query_address: String,
-    pub schema_type: SchemaType,
-}
-
-#[derive(Debug, juniper::GraphQLEnum, Clone, Copy, FromPrimitive, ToPrimitive)]
+#[derive(Debug, juniper::GraphQLEnum, Clone, Copy)]
 /// Schema type, describes what kind of query service and command service is going to be used, as timeseries databases are quite different than others.
 pub enum SchemaType {
-    DocumentStorage = 0,
-    Timeseries = 1,
+    DocumentStorage,
+    Timeseries,
+}
+
+impl Into<SchemaType> for schema_registry::types::SchemaType {
+    fn into(t: schema_registry::types::SchemaType) -> SchemaType {
+        match t {
+            schema_registry::types::SchemaType::DocumentStorage => SchemaType::DocumentStorage,
+            schema_registry::types::SchemaType::Timeseries => SchemaType::Timeseries,
+        }
+    }
 }
 
 #[derive(Debug, juniper::GraphQLObject)]

@@ -1,5 +1,6 @@
 use juniper::{graphql_object, FieldResult};
 use num_traits::ToPrimitive;
+use semver::VersionReq;
 use serde_json::value::RawValue;
 use utils::message_types::DataRouterInsertMessage;
 use uuid::Uuid;
@@ -8,48 +9,27 @@ use crate::error::Error;
 use crate::schema::context::Context;
 use crate::schema::utils::{get_schema, get_view};
 use crate::types::data::InputMessage;
-use crate::types::schema::*;
+use schema_registry::types::SchemaWithDefinitions;
 
 pub struct Mutation;
 
 #[graphql_object(context = Context)]
 impl Mutation {
-    async fn add_schema(context: &Context, new: NewSchema) -> FieldResult<Schema> {
+    async fn add_schema(context: &Context, new: NewSchema) -> FieldResult<SchemaWithDefinitions> {
         log::debug!("add schema {:?}", new);
-        let mut conn = context.connect_to_registry().await?;
 
-        let NewSchema {
-            name,
-            query_address,
-            topic,
-            definition,
-            schema_type,
-        } = new;
-
-        let rpc_schema_type: i32 = schema_type.to_i32().unwrap(); // Unwrap because we for sure can build i32 from enum
-
-        let id = conn
-            .add_schema(rpc::schema_registry::NewSchema {
-                id: "".into(),
-                name: name.clone(),
-                query_address: query_address.clone(),
-                topic: topic.clone(),
-                definition,
-                schema_type: rpc_schema_type,
+        let conn = context.connect_to_registry().await?;
+        let new_id = conn
+            .add_schema(schema_registry::types::NewSchema {
+                name: new.name,
+                r#type: new.schema_type,
+                queue: new.topic,
+                query_addr: new.query_address,
+                definition: new.definition,
             })
-            .await
-            .map_err(rpc::error::registry_error)?
-            .into_inner()
-            .id
-            .parse()?;
+            .await?;
 
-        Ok(Schema {
-            id,
-            name,
-            query_address,
-            topic,
-            schema_type,
-        })
+        conn.get_schema(new_id).await.into()
     }
 
     async fn add_schema_definition(
@@ -62,67 +42,21 @@ impl Mutation {
             schema_id,
             new_version
         );
-        let mut conn = context.connect_to_registry().await?;
 
-        let NewVersion {
-            definition,
-            version,
-        } = new_version;
-
-        conn.add_schema_version(rpc::schema_registry::NewSchemaVersion {
-            id: schema_id.to_string(),
-            version: version.clone(),
-            definition: definition.clone(),
-        })
-        .await
-        .map_err(rpc::error::registry_error)?;
+        let conn = context.connect_to_registry().await?;
+        conn.add_schema_definition(
+            schema_id,
+            schema_registry::types::SchemaDefinition {
+                version: new_version.version,
+                definition: new_version.definition,
+            },
+        )
+        .await?;
 
         Ok(Definition {
             definition,
             version,
         })
-    }
-
-    async fn add_view(context: &Context, schema_id: Uuid, new_view: NewView) -> FieldResult<View> {
-        log::debug!("add view for {} - {:?}", schema_id, new_view);
-
-        let NewView { name, expression } = new_view.clone();
-        let mut conn = context.connect_to_registry().await?;
-        let id = conn
-            .add_view_to_schema(rpc::schema_registry::NewSchemaView {
-                schema_id: schema_id.to_string(),
-                view_id: "".into(),
-                name,
-                jmespath: expression,
-            })
-            .await
-            .map_err(rpc::error::registry_error)?
-            .into_inner()
-            .id;
-
-        Ok(View {
-            id: id.parse()?,
-            name: new_view.name,
-            expression: new_view.expression,
-        })
-    }
-
-    async fn update_view(context: &Context, id: Uuid, update: UpdateView) -> FieldResult<View> {
-        log::debug!("update view for {} - {:?}", id, update);
-
-        let mut conn = context.connect_to_registry().await?;
-
-        let UpdateView { name, expression } = update;
-
-        conn.update_view(rpc::schema_registry::UpdatedView {
-            id: id.to_string(),
-            name: name.clone(),
-            jmespath: expression.clone(),
-        })
-        .await
-        .map_err(rpc::error::registry_error)?;
-
-        get_view(&mut conn, id).await
     }
 
     async fn update_schema(

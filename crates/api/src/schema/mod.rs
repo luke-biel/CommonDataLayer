@@ -2,7 +2,6 @@ pub mod context;
 pub mod mutation;
 pub mod query;
 pub mod subscription;
-pub mod utils;
 
 use juniper::RootNode;
 use mutation::Mutation;
