@@ -45,7 +45,9 @@ to each Schema: Views and Relations.
 Schemas can have zero to many views, and views are each defined as a format
 to map a value belonging to a schema into using [JMESPath][jmespath]. Any schema
 can point to any other schema (like a directed edge in a graph) with a relation,
-which defines a parent-child relationship between schemas.
+which defines a parent-child relationship between schemas. For safety, there is
+a recursion limit when loading child data to allow users to configure cyclical
+relationships but preventing memory overloads.
 
 The combination of views and relations allows for deterministic projection of any
 value under a schema into a user-defined format, even allowing for the inclusion
