@@ -34,4 +34,4 @@ tokio       = { version = "0.2", features = ["macros"] }
 tonic       = "0.3"
 url         = "2.1"
 uuid        = { version = "0.8", features = ["v1", "serde"] }
-sqlx        = { version = "0.5", features = ["runtime-tokio-rustls", "postgres", "sqlite", "macros", "uuid", "json" ] }
+sqlx        = { version = "0.5", features = ["runtime-tokio-rustls", "postgres", "sqlite", "macros", "uuid", "json", "offline" ] }

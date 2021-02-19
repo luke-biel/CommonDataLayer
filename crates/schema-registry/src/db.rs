@@ -1,6 +1,5 @@
 use super::types::{
-    NewSchema, Schema, SchemaDefinition, SchemaType, SchemaUpdate, SchemaWithDefinitions,
-    VersionedUuid,
+    NewSchema, Schema, SchemaDefinition, SchemaUpdate, SchemaWithDefinitions, VersionedUuid,
 };
 use crate::utils::build_full_schema;
 use crate::{
@@ -10,28 +9,38 @@ use crate::{
 use log::{trace, warn};
 use semver::Version;
 use serde_json::Value;
-use sqlx::{Connection, Executor, PgConnection};
+use sqlx::Connection;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-pub struct SchemaRegistryConn<C: Connection> {
-    conn: C,
+#[cfg(not(test))]
+pub type DbConn = sqlx::PgConnection;
+#[cfg(test)]
+pub type DbConn = sqlx::SqliteConnection;
+
+pub struct SchemaRegistryConn {
+    conn: DbConn,
 }
 
-impl SchemaRegistryConn<PgConnection> {
+impl SchemaRegistryConn {
+    #[cfg(not(test))]
     pub async fn connect(url: &str) -> RegistryResult<Self> {
         Ok(SchemaRegistryConn {
-            conn: PgConnection::connect(url)
+            conn: DbConn::connect(url)
                 .await
                 .map_err(RegistryError::ConnectionError)?,
         })
     }
-}
 
-impl<'c, C: Connection + Executor<'c> + 'c> SchemaRegistryConn<C>
-where
-    C::Database: Database,
-{
+    #[cfg(test)]
+    pub async fn in_memory() -> RegistryResult<Self> {
+        Ok(SchemaRegistryConn {
+            conn: sqlx::SqliteConnection::connect("::sqlite:memory:")
+                .await
+                .map_err(RegistryError::ConnectionError)?,
+        })
+    }
+
     pub async fn ensure_schema_exists(&self, id: Uuid) -> RegistryResult<()> {
         let result = sqlx::query!("SELECT id FROM schemas WHERE id = $1", id)
             .fetch_one(&self.conn)
@@ -160,7 +169,7 @@ where
                         schema.queue,
                         schema.query_addr,
                     )
-                    .execute(&c)
+                    .execute(c)
                     .await?;
 
                     sqlx::query!(
@@ -169,7 +178,7 @@ where
                         schema.definition,
                         new_id
                     )
-                    .execute(&c)
+                    .execute(c)
                     .await?;
 
                     Ok(())
@@ -200,7 +209,7 @@ where
     }
 
     pub async fn add_new_version_of_schema(
-        &self,
+        &mut self,
         id: Uuid,
         new_version: SchemaDefinition,
     ) -> RegistryResult<()> {
@@ -221,7 +230,7 @@ where
             new_version.definition,
             id
         )
-        .execute(&self.conn)
+        .execute(&mut self.conn)
         .await?;
 
         Ok(())
@@ -236,12 +245,14 @@ where
         let schema = jsonschema::JSONSchema::compile(&definition)
             .map_err(RegistryError::InvalidJsonSchema)?;
 
-        match schema.validate(&json) {
+        let result = match schema.validate(&json) {
             Ok(()) => Ok(()),
             Err(errors) => Err(RegistryError::InvalidData(
                 errors.map(|err| err.to_string()).collect(),
             )),
-        }
+        };
+
+        result
     }
 
     pub async fn import_all(&self, imported: DbExport) -> RegistryResult<()> {
@@ -263,7 +274,7 @@ where
                             schema.queue,
                             schema.query_addr
                         )
-                        .execute(&c)
+                        .execute(c)
                         .await?;
 
                         for definition in schema.definitions {
@@ -274,7 +285,7 @@ where
                                 definition.definition,
                                 schema_id
                             )
-                            .execute(&c)
+                            .execute(c)
                             .await?;
                         }
                     }
@@ -301,13 +312,11 @@ mod tests {
     use serde_json::json;
     use sqlx::SqliteConnection;
 
-    #[test]
-    fn import_non_empty() -> Result<()> {
-        let (to_import, schema1_id, view1_id) = prepare_db_export()?;
+    #[tokio::test]
+    async fn import_non_empty() -> Result<()> {
+        let (to_import, schema1_id, view1_id) = prepare_db_export().await?;
 
-        let conn = SchemaRegistryConn {
-            conn: sqlx::MemoryDatastore::default(),
-        };
+        let conn = SchemaRegistryConn::in_memory().await?;
         let schema2_id = conn.add_schema(schema2(), None)?;
         let view2_id = conn.add_view_to_schema(schema2_id, view2(), None)?;
 
@@ -423,8 +432,8 @@ mod tests {
 
     #[test]
     fn update_schema_type() -> Result<()> {
-        let db = SchemaDb {
-            db: MemoryDatastore::default(),
+        let db = SchemaRegistryConn {
+            conn: SqliteConnection::connect("::sqlite:memory:").await.unwrap(),
         };
         let schema_id = db.add_schema(schema1(), None)?;
 
@@ -494,7 +503,7 @@ mod tests {
     async fn prepare_db_export() -> Result<(DbExport, Uuid, Uuid)> {
         // SchemaId, ViewId
         let db = SchemaDb {
-            db: SqliteConnection::connect("::sqlite:memory:").await?,
+            conn: SqliteConnection::connect("::sqlite:memory:").await?,
         };
 
         let schema_id = db.add_schema(schema1(), None)?;

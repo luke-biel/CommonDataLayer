@@ -2,12 +2,11 @@ use crate::error::{RegistryError, RegistryResult};
 use crate::{db::SchemaRegistryConn, types::VersionedUuid};
 use jsonschema::JSONSchema;
 use serde_json::Value;
-use sqlx::Connection;
 use uuid::Uuid;
 
-pub async fn build_full_schema<C: Connection>(
+pub async fn build_full_schema(
     mut schema: Value,
-    conn: &SchemaRegistryConn<C>,
+    conn: &SchemaRegistryConn,
 ) -> RegistryResult<Value> {
     if let Some(defs) = schema
         .get_mut("definitions")
