@@ -1,7 +1,7 @@
 use anyhow::Context;
 use log::{debug, error, trace};
-use lru_cache::LruCache;
-use rpc::schema_registry::Id;
+use schema_registry::types::Schema;
+use schema_registry::watcher::DbWatcher;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -80,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
     pin!(message_stream);
 
     let error_topic_or_exchange = Arc::new(config.error_topic_or_exchange);
-    let schema_registry_addr = Arc::new(config.schema_registry_addr);
+    let schema_cache = DbWatcher::watch_schemas(config.schema_registry_addr);
 
     let task_limiter = TaskLimiter::new(config.task_limit);
 
@@ -92,7 +92,7 @@ async fn main() -> anyhow::Result<()> {
                     cache.clone(),
                     producer.clone(),
                     error_topic_or_exchange.clone(),
-                    schema_registry_addr.clone(),
+                    schema_cache.clone(),
                 );
 
                 if !config.monotasking {
@@ -263,7 +263,7 @@ async fn route(
     cache: &Mutex<LruCache<Uuid, String>>,
     event: &DataRouterInsertMessage<'_>,
     producer: &CommonPublisher,
-    schema_registry_addr: &str,
+    schema_cache: DbWatcher<Schema, Uuid>,
 ) -> anyhow::Result<()> {
     let payload = BorrowedInsertMessage {
         object_id: event.object_id,
@@ -272,44 +272,18 @@ async fn route(
         timestamp: current_timestamp(),
         data: event.data,
     };
-    let topic_name = get_schema_topic(&cache, payload.schema_id, &schema_registry_addr).await?;
 
+    let schema_topic = schema_cache
+        .get(event.schema_id)
+        .ok_or_else(|| anyhow::anyhow!("No schema found with ID {}", event.schema_id))?
+        .read()
+        .unwrap()
+        .queue
+        .clone();
     let key = payload.object_id.to_string();
-    send_message(producer, &topic_name, &key, serde_json::to_vec(&payload)?).await;
+
+    send_message(producer, &schema_topic, &key, serde_json::to_vec(&payload)?).await;
     Ok(())
-}
-
-async fn get_schema_topic(
-    cache: &Mutex<LruCache<Uuid, String>>,
-    schema_id: Uuid,
-    schema_addr: &str,
-) -> anyhow::Result<String> {
-    let recv_channel = cache
-        .lock()
-        .unwrap_or_else(abort_on_poison)
-        .get_mut(&schema_id)
-        .cloned();
-    if let Some(val) = recv_channel {
-        trace!("Retrieved topic for {} from cache", schema_id);
-        return Ok(val);
-    }
-
-    let mut client = rpc::schema_registry::connect(schema_addr.to_owned()).await?;
-    let channel = client
-        .get_schema_topic(Id {
-            id: schema_id.to_string(),
-        })
-        .await?
-        .into_inner()
-        .topic;
-
-    trace!("Retrieved topic for {} from schema registry", schema_id);
-    cache
-        .lock()
-        .unwrap_or_else(abort_on_poison)
-        .insert(schema_id, channel.clone());
-
-    Ok(channel)
 }
 
 async fn send_message(producer: &CommonPublisher, topic_name: &str, key: &str, payload: Vec<u8>) {
