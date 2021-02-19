@@ -14,6 +14,7 @@ path = "src/main.rs"
 [dependencies]
 # Workspace
 rpc         = { path = "../rpc" }
+schema-registry         = { path = "../schema-registry" }
 
 # Crates.io
 anyhow      = "1.0"
