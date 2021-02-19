@@ -6,7 +6,7 @@ Author: Łukasz Biel
 Team: CDL
 Reviewer: CDLTeam
 Created on: 5/2/2021
-Last updated: 5/2/2021
+Last updated: 19/2/2021
 Tracking issue: https://github.com/epiphany-platform/CommonDataLayer/issues/224
 ```
 
@@ -63,34 +63,59 @@ Schema-less environments (eg. no validator) still rely on schema-registry.
 * `view_definition` }|-- `(schema_id, version)`
 
 
-Structure assumes existence of `data-materializer`, and when `data-materializer` would be introduced this structure can change.
 `repository_type` refers to distinction between `TIMESERIES` and `DOCUMENT_STORAGE`, 
 and is necessary when validating payloads, as different kinds of repositories have slightly different message formats.
+
+`schema-registry` must also contain repository mapping information. We will use simple key-value table,
+
+`schema_id` -> `repository_id`
+
+Schema must start accepting new routes, namely registration and removal of a repository, from now on.
 
 ### Configuration Service
 `configuration-service` would replace `SR` functionality of serving repository metadata.
 
-All `command-service`s would need to receive additional config: `CONFIGURATION_SERVICE_URL`.
-Once started `CS` would send a request to `configuration-service` with it's metadata in order to `register`. Such request would consist of:
-* repository database - a string
-* repository type - a string/enum
-* repository_id - a uuid
-A command service would start listening on port/topic/etc. provided in response to register request.
+On startup, all CDL services query `configuration service` for config using `CONFIGURATION_URL.` 
+Repository services would identify themselves using `repository_id.`
+`repository_id` is not unique and could be shared between multiple replicas of given service. 
+`command-service` and `query-service` belonging to one repository should share one `repository_id.`
 
-For each repository registration request `configuration-service` would add an entry to it's DB.
-For each `repository_id` `configuration-service` stores:
-* human readable name (eg. postgres-document-1)
-* ingestion means (address/topic/queue)
-* egestion address
-* repository type
-* repository database
+The final goal is to move most environment variables away from CDL services into a static,
+global database - `configuration service.`:
 
-`configuration-service` allows users to declare `schema_id`s connected to given repository.
-Such connection dictionary would be keyed on `schema_id` to decrease lookup latency
-and would require connection between `schema` and `repository` to be many-to-one.
+* Global config:
+    * communication method
+* Data router config:
+    * Message broker
+    * Input topic
+    * Broker group id
+    * Error reporting channel
+    * Cache capacity
+    * Parallel task limit
+    * Monotasking
+* Query router config:
+    * Cache capacity
+    * Input port
+* Command service config (depending on communication method global):
+    * Message brokers
+    * Ordered input topics
+    * Unordered topics
+    * Consumer group_id/tag
+    * Grpc port
+    * Parallel task limit
+    * Database connection params (We should we fine if we kept these in repos though)
+* Query service (both):
+    * Input port
+    * Database connection params (Same as above)
+    
+This would leave `data-router` and `query-router` with variables:
+* CONFIGURATION_URL
+* SCHEMA_REGISTRY_URL
 
-All configuration in `configuration-service` should be backed by some database (we can consider sled here, however we should implemented 
-a wrapper over it, so features like replication are shared between `configuration-service` and `schema-registry`).
+Same goes for `command-service` and `query-service`, with addition of `REPOSITORY_ID`.
+
+All configuration in `configuration-service` should be backed by some database 
+(we can consider sled here, but we should implement a wrapper over it, so features like replication are shared between `configuration-service` and `schema-registry`).
 It needs to support replication and disk backups.
 
 `configuration-service` should support `--import` and `--export` flags as current `schema-registry` does.
@@ -100,25 +125,19 @@ while `API` crate should provide end-user, easy to read/write, http api access.
 
 Supported `gRPC` queries are:
 
-* register
+* get_config - returns config for given app
 * list_repositories
 * describe_repository
 * add_repository
 * rm_repository
 * update_repository_X, where X is a repository's field
-* add_schema
-* rm_schema
-* get_all_repository_schemas
 
-### Questions
+### Initial Implementation
 
-* Should we store repository database in `configuration-service` since it's only used in repo name creation?
-* Should `configuration-service` perform a health check on repos to determine if one wasn't deleted? 
-* Should it verify existence and manage creation of topics/queues for `command-service`s when cdl uses `MQ`?
-* We must consider whether `repository_id` should be a string like kafka `group_id` or uuid.
-* What should be behaviour of register when repository wasn't pre-declared in configuration service?
-* Should it be `CS` responsibility to connect to repository or should repository contain special connector service?
-* Shouldn't `QS` also get info about configuration and eg. port from `configuration-service`?
+Initial implementation of `configuration-service` should do as follows:
+* move `topic`, `query-address` and `repository-type` from `SR` to `conf-service`
+* add `schema_id` -> `repository_id` matcher in `SR`
+* alter `DR` and `QR` to use `configuration-service` for routing
 
 ### Other considerations
 #### Connector
@@ -131,6 +150,8 @@ instead of this protocol being served to them via an env.
 
 #### A library
 We could write `configuration-service` in such way so that DR/CDLite/our clients can include it as an library.
+
+However, using `config-service` as a library for existing CDL components is a questionable topic.
 
 #### Propagate logging level
 We could init logging level via `configuration-service` and even change it on the fly.
