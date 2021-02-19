@@ -1,11 +1,10 @@
-use cache::SchemaRegistryCache;
+use schema_registry::watcher::DbWatcher;
 use std::sync::Arc;
 use structopt::StructOpt;
 use utils::metrics;
 use uuid::Uuid;
 use warp::Filter;
 
-pub mod cache;
 pub mod error;
 pub mod handler;
 
@@ -20,17 +19,14 @@ struct Config {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let config = Config::from_args();
 
     metrics::serve();
 
-    let schema_registry_cache = Arc::new(SchemaRegistryCache::new(
-        config.schema_registry_addr,
-        config.cache_capacity,
-    ));
+    let schema_registry_cache = DbWatcher::watch_schemas(config.schema_registry_addr).await?;
 
     let address_filter = warp::any().map(move || schema_registry_cache.clone());
     let schema_id_filter = warp::header::header::<Uuid>("SCHEMA_ID");
@@ -62,4 +58,6 @@ async fn main() {
     warp::serve(routes)
         .run(([0, 0, 0, 0], config.input_port))
         .await;
+
+    Ok(())
 }
