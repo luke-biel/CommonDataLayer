@@ -5,9 +5,9 @@ use serde_json::Value;
 use uuid::Uuid;
 
 pub async fn build_full_schema(
-    mut schema: Value,
-    conn: &SchemaRegistryConn,
-) -> RegistryResult<Value> {
+    schema: &mut Value,
+    conn: &mut SchemaRegistryConn,
+) -> RegistryResult<()> {
     if let Some(defs) = schema
         .get_mut("definitions")
         .and_then(|val| val.as_object_mut())
@@ -31,5 +31,5 @@ pub async fn build_full_schema(
 
     JSONSchema::compile(&schema).map_err(RegistryError::InvalidJsonSchema)?;
 
-    Ok(schema)
+    Ok(())
 }

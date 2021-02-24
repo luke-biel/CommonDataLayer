@@ -1,7 +1,6 @@
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 use uuid::Uuid;
 
 // Helper structures
@@ -47,7 +46,7 @@ impl SchemaWithDefinitions {
         self.definitions
             .iter()
             .filter(|d| version.matches(&d.version))
-            .max_by_key(|d| d.version)
+            .max_by_key(|d| &d.version)
     }
 }
 
@@ -120,5 +119,5 @@ impl std::str::FromStr for SchemaType {
 // Import export
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct DbExport {
-    pub schemas: HashMap<Uuid, SchemaWithDefinitions>,
+    pub schemas: Vec<SchemaWithDefinitions>,
 }

@@ -1,5 +1,6 @@
 use super::types::{
-    NewSchema, Schema, SchemaDefinition, SchemaUpdate, SchemaWithDefinitions, VersionedUuid,
+    NewSchema, Schema, SchemaDefinition, SchemaType, SchemaUpdate, SchemaWithDefinitions,
+    VersionedUuid,
 };
 use crate::utils::build_full_schema;
 use crate::{
@@ -9,21 +10,19 @@ use crate::{
 use log::{trace, warn};
 use semver::Version;
 use serde_json::Value;
-use sqlx::Connection;
-use std::collections::HashMap;
+use sqlx::{Acquire, Connection};
 use uuid::Uuid;
 
-#[cfg(not(test))]
+// #[cfg(not(test))]
 pub type DbConn = sqlx::PgConnection;
-#[cfg(test)]
-pub type DbConn = sqlx::SqliteConnection;
+// #[cfg(test)]
+// pub type DbConn = sqlx::SqliteConnection;
 
 pub struct SchemaRegistryConn {
     conn: DbConn,
 }
 
 impl SchemaRegistryConn {
-    #[cfg(not(test))]
     pub async fn connect(url: &str) -> RegistryResult<Self> {
         Ok(SchemaRegistryConn {
             conn: DbConn::connect(url)
@@ -32,18 +31,9 @@ impl SchemaRegistryConn {
         })
     }
 
-    #[cfg(test)]
-    pub async fn in_memory() -> RegistryResult<Self> {
-        Ok(SchemaRegistryConn {
-            conn: sqlx::SqliteConnection::connect("::sqlite:memory:")
-                .await
-                .map_err(RegistryError::ConnectionError)?,
-        })
-    }
-
-    pub async fn ensure_schema_exists(&self, id: Uuid) -> RegistryResult<()> {
+    pub async fn ensure_schema_exists(&mut self, id: Uuid) -> RegistryResult<()> {
         let result = sqlx::query!("SELECT id FROM schemas WHERE id = $1", id)
-            .fetch_one(&self.conn)
+            .fetch_one(&mut self.conn)
             .await;
 
         match result {
@@ -53,25 +43,37 @@ impl SchemaRegistryConn {
         }
     }
 
-    pub async fn get_schema(&self, id: Uuid) -> RegistryResult<Schema> {
-        sqlx::query_as!(Schema, "SELECT * FROM schemas WHERE id = $1", id)
-            .fetch_one(&self.conn)
-            .await
-            .into()
+    pub async fn get_schema(&mut self, id: Uuid) -> RegistryResult<Schema> {
+        sqlx::query_as!(
+            Schema,
+            "SELECT id, name, queue, query_addr, type as \"type: _\" \
+             FROM schemas WHERE id = $1",
+            id
+        )
+        .fetch_one(&mut self.conn)
+        .await
+        .map_err(RegistryError::DbError)
     }
 
     pub async fn get_schema_with_definitions(
-        &self,
+        &mut self,
         id: Uuid,
     ) -> RegistryResult<SchemaWithDefinitions> {
         let schema = self.get_schema(id).await?;
-        let definitions = sqlx::query_as!(
-            SchemaDefinition,
+        let definitions = sqlx::query!(
             "SELECT version, definition FROM definitions WHERE schema = $1",
             id
         )
-        .fetch_all(&self.conn)
-        .await?;
+        .fetch_all(&mut self.conn)
+        .await?
+        .into_iter()
+        .map(|row| {
+            Ok(SchemaDefinition {
+                version: Version::parse(&row.version).map_err(RegistryError::InvalidVersion)?,
+                definition: row.definition,
+            })
+        })
+        .collect::<RegistryResult<Vec<SchemaDefinition>>>()?;
 
         Ok(SchemaWithDefinitions {
             id: schema.id,
@@ -84,29 +86,35 @@ impl SchemaRegistryConn {
     }
 
     pub async fn get_schema_definition(
-        &self,
+        &mut self,
         id: &VersionedUuid,
     ) -> RegistryResult<(Version, Value)> {
         let version = self.get_latest_valid_schema_version(id).await?;
-        let definition = sqlx::query!(
+        let row = sqlx::query!(
             "SELECT definition FROM definitions WHERE schema = $1 and version = $2",
             id.id,
-            &version
+            version.to_string()
         )
-        .fetch_one(&self.conn)
+        .fetch_one(&mut self.conn)
         .await?;
 
-        Ok((version, definition))
+        Ok((version, row.definition))
     }
 
-    pub async fn get_schema_versions(&self, id: Uuid) -> RegistryResult<Vec<Version>> {
+    pub async fn get_schema_versions(&mut self, id: Uuid) -> RegistryResult<Vec<Version>> {
         sqlx::query!("SELECT version FROM definitions WHERE schema = $1", id)
-            .fetch_all(&self.conn)
+            .fetch_all(&mut self.conn)
             .await
-            .map_err(RegistryError::DbError)
+            .map_err(RegistryError::DbError)?
+            .into_iter()
+            .map(|row| Version::parse(&row.version).map_err(RegistryError::InvalidVersion))
+            .collect()
     }
 
-    async fn get_latest_valid_schema_version(&self, id: &VersionedUuid) -> RegistryResult<Version> {
+    async fn get_latest_valid_schema_version(
+        &mut self,
+        id: &VersionedUuid,
+    ) -> RegistryResult<Version> {
         self.get_schema_versions(id.id)
             .await?
             .into_iter()
@@ -115,61 +123,78 @@ impl SchemaRegistryConn {
             .ok_or_else(|| RegistryError::NoVersionMatchesRequirement(id.clone()))
     }
 
-    pub async fn get_all_schemas(&self) -> RegistryResult<HashMap<Uuid, Schema>> {
-        sqlx::query_as!(Schema, "SELECT * FROM schemas ORDER BY name")
-            .fetch_all(&self.conn)
-            .await
-            .map_err(RegistryError::DbError)
+    pub async fn get_all_schemas(&mut self) -> RegistryResult<Vec<Schema>> {
+        sqlx::query_as!(
+            Schema,
+            "SELECT id, name, queue, query_addr, type as \"type: _\" \
+             FROM schemas ORDER BY name"
+        )
+        .fetch_all(&mut self.conn)
+        .await
+        .map_err(RegistryError::DbError)
     }
 
     pub async fn get_all_schemas_with_definitions(
-        &self,
-    ) -> RegistryResult<HashMap<Uuid, SchemaWithDefinitions>> {
-        let all_schemas = sqlx::query_as!(Schema, "SELECT * FROM schemas")
-            .fetch_all(&self.conn)
-            .await?;
-        let mut definitions = sqlx::query_as!(SchemaDefinition, "SELECT * FROM definitions")
-            .fetch_all(&self.conn)
-            .await?;
+        &mut self,
+    ) -> RegistryResult<Vec<SchemaWithDefinitions>> {
+        let all_schemas = sqlx::query_as!(
+            Schema,
+            "SELECT id, name, queue, query_addr, type as \"type: _\" FROM schemas"
+        )
+        .fetch_all(&mut self.conn)
+        .await?;
+        let mut all_definitions =
+            sqlx::query!("SELECT version, definition, schema FROM definitions")
+                .fetch_all(&mut self.conn)
+                .await?;
 
-        let schemas = all_schemas
+        all_schemas
             .into_iter()
-            .map(|schema| SchemaWithDefinitions {
-                id: schema.id,
-                name: schema.name,
-                r#type: schema.r#type,
-                queue: schema.queue,
-                query_addr: schema.query_addr,
-                definitions: definitions
+            .map(|schema: Schema| {
+                let definitions = all_definitions
                     .drain_filter(|d| d.schema == schema.id)
-                    .collect(),
-            })
-            .collect();
+                    .map(|row| {
+                        Ok(SchemaDefinition {
+                            version: Version::parse(&row.version)
+                                .map_err(RegistryError::InvalidVersion)?,
+                            definition: row.definition,
+                        })
+                    })
+                    .collect::<RegistryResult<Vec<SchemaDefinition>>>()?;
 
-        Ok(schemas)
+                Ok(SchemaWithDefinitions {
+                    id: schema.id,
+                    name: schema.name,
+                    r#type: schema.r#type,
+                    queue: schema.queue,
+                    query_addr: schema.query_addr,
+                    definitions,
+                })
+            })
+            .collect()
     }
 
     pub async fn add_schema(
-        &self,
+        &mut self,
         mut schema: NewSchema,
         new_id: Option<Uuid>,
     ) -> RegistryResult<Uuid> {
-        let new_id = Uuid::new_v4();
-        let full_definition = build_full_schema(schema.definition, self).await?;
+        let new_id = new_id.unwrap_or_else(Uuid::new_v4);
+        build_full_schema(&mut schema.definition, self).await?;
 
         self.conn
-            .transaction(|c| {
+            .transaction::<_, _, RegistryError>(move |c| {
                 Box::pin(async move {
                     sqlx::query!(
                         "INSERT INTO schemas(id, name, type, queue, query_addr) \
                          VALUES($1, $2, $3, $4, $5)",
-                        new_id,
-                        schema.name,
-                        schema.r#type,
-                        schema.queue,
-                        schema.query_addr,
+                        &new_id,
+                        &schema.name,
+                        &schema.r#type as &SchemaType,
+                        &schema.queue,
+                        &schema.query_addr,
                     )
-                    .execute(c)
+                    .execute(c.acquire().await?)
                     .await?;
 
                     sqlx::query!(
@@ -191,18 +216,18 @@ impl SchemaRegistryConn {
         Ok(new_id)
     }
 
-    pub async fn update_schema(&self, id: Uuid, update: SchemaUpdate) -> RegistryResult<()> {
+    pub async fn update_schema(&mut self, id: Uuid, update: SchemaUpdate) -> RegistryResult<()> {
         let old_schema = self.get_schema(id).await?;
 
         sqlx::query!(
             "UPDATE schemas SET name = $1, type = $2, queue = $3, query_addr = $4 WHERE id = $5",
-            update.name.unwrap_or_default(old_schema.name),
-            update.r#type.unwrap_or_default(old_schema.r#type),
-            update.queue.unwrap_or_default(old_schema.queue),
-            update.query_addr.unwrap_or_default(old_schema.query_addr),
+            update.name.unwrap_or(old_schema.name),
+            update.r#type.unwrap_or(old_schema.r#type) as _,
+            update.queue.unwrap_or(old_schema.queue),
+            update.query_addr.unwrap_or(old_schema.query_addr),
             id
         )
-        .execute(&self.conn)
+        .execute(&mut self.conn)
         .await?;
 
         Ok(())
@@ -237,7 +262,7 @@ impl SchemaRegistryConn {
     }
 
     pub async fn validate_data_with_schema(
-        &self,
+        &mut self,
         schema_id: VersionedUuid,
         json: &Value,
     ) -> RegistryResult<()> {
@@ -255,37 +280,37 @@ impl SchemaRegistryConn {
         result
     }
 
-    pub async fn import_all(&self, imported: DbExport) -> RegistryResult<()> {
+    pub async fn import_all(&mut self, imported: DbExport) -> RegistryResult<()> {
         if !self.get_all_schemas().await?.is_empty() {
             warn!("[IMPORT] Database is not empty, skipping importing");
             return Ok(());
         }
 
         self.conn
-            .transaction(|c| {
+            .transaction::<_, _, RegistryError>(move |c| {
                 Box::pin(async move {
-                    for (schema_id, schema) in imported.schemas {
+                    for schema in imported.schemas {
                         sqlx::query!(
-                            "INSERT INTO schemas(id, name, type, queue, query_addr)
+                            "INSERT INTO schemas(id, name, type, queue, query_addr) \
                              VALUES($1, $2, $3, $4, $5)",
-                            schema_id,
+                            schema.id,
                             schema.name,
-                            schema.r#type,
+                            schema.r#type as _,
                             schema.queue,
                             schema.query_addr
                         )
-                        .execute(c)
+                        .execute(c.acquire().await?)
                         .await?;
 
                         for definition in schema.definitions {
                             sqlx::query!(
-                                "INSERT INTO definitions(version, definition, schema)
+                                "INSERT INTO definitions(version, definition, schema) \
                                  VALUES($1, $2, $3)",
                                 definition.version.to_string(),
                                 definition.definition,
-                                schema_id
+                                schema.id
                             )
-                            .execute(c)
+                            .execute(c.acquire().await?)
                             .await?;
                         }
                     }
@@ -298,7 +323,7 @@ impl SchemaRegistryConn {
         Ok(())
     }
 
-    pub async fn export_all(&self) -> RegistryResult<DbExport> {
+    pub async fn export_all(&mut self) -> RegistryResult<DbExport> {
         Ok(DbExport {
             schemas: self.get_all_schemas_with_definitions().await?,
         })
@@ -308,17 +333,23 @@ impl SchemaRegistryConn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::SchemaType;
     use anyhow::Result;
     use serde_json::json;
-    use sqlx::SqliteConnection;
+    use sqlx::{Connection, SqliteConnection};
+
+    async fn test_db() -> SchemaRegistryConn {
+        SchemaRegistryConn::connect("::sqlite:memory:")
+            .await
+            .unwrap()
+    }
 
     #[tokio::test]
     async fn import_non_empty() -> Result<()> {
         let (to_import, schema1_id, view1_id) = prepare_db_export().await?;
 
-        let conn = SchemaRegistryConn::in_memory().await?;
-        let schema2_id = conn.add_schema(schema2(), None)?;
-        let view2_id = conn.add_view_to_schema(schema2_id, view2(), None)?;
+        let mut conn = test_db().await;
+        let schema2_id = conn.add_schema(schema2(), None).await?;
 
         conn.ensure_schema_exists(schema2_id)?;
         assert!(conn.ensure_schema_exists(schema1_id).is_err());
@@ -461,16 +492,9 @@ mod tests {
                     }
                 }
             }),
-            kafka_topic: "topic1".into(),
-            query_address: "query1".into(),
-            schema_type: SchemaType::DocumentStorage,
-        }
-    }
-
-    fn view1() -> View {
-        View {
-            name: "view1".into(),
-            jmespath: "{ a: a }".into(),
+            queue: "topic1".into(),
+            query_addr: "query1".into(),
+            r#type: SchemaType::DocumentStorage,
         }
     }
 
@@ -490,13 +514,6 @@ mod tests {
             kafka_topic: "topic2".into(),
             query_address: "query2".into(),
             schema_type: SchemaType::DocumentStorage,
-        }
-    }
-
-    fn view2() -> View {
-        View {
-            name: "view2".into(),
-            jmespath: "{ a: a }".into(),
         }
     }
 
