@@ -10,6 +10,8 @@ use crate::{
     events::EventStream,
     events::EventSubscriber,
 };
+use rpc::schema_registry::schema_registry_client::SchemaRegistryClient;
+use rpc::tonic::transport::Channel;
 
 #[derive(Clone)]
 pub struct Context {
@@ -32,7 +34,7 @@ impl Context {
     }
 
     pub async fn connect_to_registry(&self) -> Result<SchemaRegistryConn> {
-        schema_registry::db::SchemaRegistryConn::connect(&self.config.schema_registry_addr)
+        rpc::schema_registry::connect(self.config.schema_registry_addr.clone())
             .await
             .context("Failed to connect to the schema registry")
     }

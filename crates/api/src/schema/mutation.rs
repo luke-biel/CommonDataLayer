@@ -1,15 +1,14 @@
 use juniper::{graphql_object, FieldResult};
-use num_traits::ToPrimitive;
-use semver::VersionReq;
-use serde_json::value::RawValue;
+use serde_json::value::{RawValue, Value};
 use utils::message_types::DataRouterInsertMessage;
 use uuid::Uuid;
 
 use crate::error::Error;
 use crate::schema::context::Context;
-use crate::schema::utils::{get_schema, get_view};
 use crate::types::data::InputMessage;
-use schema_registry::types::SchemaWithDefinitions;
+use crate::types::schema::{
+    Definition, NewSchema, NewVersion, SchemaWithDefinitions, UpdateSchema,
+};
 
 pub struct Mutation;
 
@@ -18,18 +17,28 @@ impl Mutation {
     async fn add_schema(context: &Context, new: NewSchema) -> FieldResult<SchemaWithDefinitions> {
         log::debug!("add schema {:?}", new);
 
-        let conn = context.connect_to_registry().await?;
+        let mut conn = context.connect_to_registry().await?;
+        let r#type: rpc::schema_registry::types::SchemaType = new.r#type.into();
         let new_id = conn
-            .add_schema(schema_registry::types::NewSchema {
-                name: new.name,
-                r#type: new.schema_type,
-                queue: new.topic,
-                query_addr: new.query_address,
-                definition: new.definition,
+            .add_schema(rpc::schema_registry::NewSchema {
+                metadata: rpc::schema_registry::SchemaMetadata {
+                    name: new.name,
+                    r#type: r#type as i32,
+                    topic_or_queue: new.topic_or_queue,
+                    query_address: new.query_address,
+                },
+                definition: rmp_serde::to_vec(&serde_json::from_str::<Value>(&new.definition)?)?,
             })
-            .await?;
+            .await?
+            .into_inner()
+            .id;
 
-        conn.get_schema(new_id).await.into()
+        let schema = conn
+            .get_schema_with_definitions(rpc::schema_registry::Id { id: new_id })
+            .await?
+            .into_inner();
+
+        SchemaWithDefinitions::from_rpc(schema)
     }
 
     async fn add_schema_definition(
@@ -43,19 +52,21 @@ impl Mutation {
             new_version
         );
 
-        let conn = context.connect_to_registry().await?;
-        conn.add_schema_definition(
-            schema_id,
-            schema_registry::types::SchemaDefinition {
-                version: new_version.version,
-                definition: new_version.definition,
+        let mut conn = context.connect_to_registry().await?;
+        conn.add_schema_version(rpc::schema_registry::NewSchemaVersion {
+            id: schema_id.to_string(),
+            definition: rpc::schema_registry::SchemaDefinition {
+                version: new_version.version.clone(),
+                definition: rmp_serde::to_vec(&serde_json::from_str::<Value>(
+                    &new_version.definition,
+                )?)?,
             },
-        )
+        })
         .await?;
 
         Ok(Definition {
-            definition,
-            version,
+            definition: new_version.definition,
+            version: new_version.version,
         })
     }
 
@@ -63,28 +74,29 @@ impl Mutation {
         context: &Context,
         id: Uuid,
         update: UpdateSchema,
-    ) -> FieldResult<Schema> {
+    ) -> FieldResult<SchemaWithDefinitions> {
         log::debug!("update schema for {} - {:?}", id, update);
 
         let mut conn = context.connect_to_registry().await?;
-
-        let UpdateSchema {
-            name,
-            query_address: address,
-            topic,
-            schema_type,
-        } = update;
-
-        conn.update_schema_metadata(rpc::schema_registry::SchemaMetadataUpdate {
+        let r#type: Option<rpc::schema_registry::types::SchemaType> =
+            update.r#type.map(|st| st.into());
+        conn.update_schema(rpc::schema_registry::SchemaMetadataUpdate {
             id: id.to_string(),
-            name,
-            address,
-            topic,
-            schema_type: schema_type.and_then(|s| s.to_i32()),
+            patch: rpc::schema_registry::SchemaMetadataPatch {
+                name: update.name,
+                query_address: update.query_address,
+                topic_or_queue: update.topic_or_queue,
+                r#type: r#type.map(|st| st as i32),
+            },
         })
-        .await
-        .map_err(rpc::error::registry_error)?;
-        get_schema(&mut conn, id).await
+        .await?;
+
+        let schema = conn
+            .get_schema_with_definitions(rpc::schema_registry::Id { id: id.to_string() })
+            .await?
+            .into_inner();
+
+        SchemaWithDefinitions::from_rpc(schema)
     }
 
     async fn insert_message(context: &Context, message: InputMessage) -> FieldResult<bool> {

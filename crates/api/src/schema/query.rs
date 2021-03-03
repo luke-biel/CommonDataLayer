@@ -1,13 +1,10 @@
 use std::collections::HashMap;
 
-use crate::error::{Error, Result};
 use crate::schema::context::Context;
-use crate::schema::utils::{get_schema, get_view};
 use crate::types::data::CdlObject;
-use schema_registry::types::{SchemaDefinition, SchemaWithDefinitions};
+use crate::types::schema::{Definition, SchemaType, SchemaWithDefinitions};
 
 use juniper::{graphql_object, FieldResult};
-use num_traits::FromPrimitive;
 use semver::VersionReq;
 use uuid::Uuid;
 
@@ -25,31 +22,35 @@ impl SchemaWithDefinitions {
     }
 
     /// Message queue topic to which data is inserted by data-router.
-    fn topic(&self) -> &str {
-        &self.queue
+    fn topic_or_queue(&self) -> &str {
+        &self.topic_or_queue
     }
 
     /// Address of the query service responsible for retrieving data from DB
     fn query_address(&self) -> &str {
-        &self.query_addr
+        &self.query_address
     }
 
-    #[graphql(name = "type")]
-    fn schema_type(&self) -> SchemaType {
+    /// Whether this schema represents documents or timeseries data.
+    fn r#type(&self) -> SchemaType {
         self.r#type
     }
 
     /// Returns schema definition for given version.
     /// Schema is following semantic versioning, querying for "2.1.0" will return "2.1.1" if exist,
     /// querying for "=2.1.0" will return "2.1.0" if exist
-    async fn definition(&self, version: VersionReq) -> FieldResult<SchemaDefinition> {
-        self.definition(version)
-            .ok_or_else(|| anyhow::anyhow!("No definition matches the given requirement"))
+    fn definition(&self, version_req: String) -> FieldResult<&Definition> {
+        let version_req = VersionReq::parse(&version_req)?;
+        let definition = self
+            .get_definition(version_req)
+            .ok_or_else(|| "No definition matches the given requirement")?;
+
+        Ok(definition)
     }
 
     /// All definitions connected to this schema.
     /// Each schema can have only one active definition, under latest version but also contains history for backward compability.
-    async fn definitions(&self, context: &Context) -> &Vec<Definition> {
+    fn definitions(&self) -> &Vec<Definition> {
         &self.definitions
     }
 }
@@ -60,24 +61,31 @@ pub struct Query;
 impl Query {
     /// Return single schema for given id
     async fn schema(context: &Context, id: Uuid) -> FieldResult<SchemaWithDefinitions> {
-        context
+        let schema = context
             .connect_to_registry()
             .await?
-            .get_schema_with_definitions(id)
-            .await
-            .into()
+            .get_schema_with_definitions(rpc::schema_registry::Id { id: id.to_string() })
+            .await?
+            .into_inner();
+
+        SchemaWithDefinitions::from_rpc(schema)
     }
 
     /// Return all schemas in database
     async fn schemas(context: &Context) -> FieldResult<Vec<SchemaWithDefinitions>> {
         log::debug!("get all schemas");
 
-        context
-            .connect_to_registry()
+        let mut conn = context.connect_to_registry().await?;
+        let schemas = conn
+            .get_all_schemas_with_definitions(rpc::schema_registry::Empty {})
             .await?
-            .get_all_schemas_with_definitions(id)
-            .await
-            .into()
+            .into_inner()
+            .schemas;
+
+        schemas
+            .into_iter()
+            .map(SchemaWithDefinitions::from_rpc)
+            .collect()
     }
 
     /// Return a single object from the query router
