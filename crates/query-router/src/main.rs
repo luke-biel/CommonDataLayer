@@ -13,6 +13,8 @@ struct Config {
     schema_registry_addr: String,
     #[structopt(long, env = "INPUT_PORT")]
     input_port: u16,
+    #[structopt(default_value = metrics::DEFAULT_PORT, env)]
+    pub metrics_port: u16,
 }
 
 #[tokio::main]
@@ -21,7 +23,7 @@ async fn main() -> anyhow::Result<()> {
 
     let config = Config::from_args();
 
-    metrics::serve();
+    metrics::serve(config.metrics_port);
 
     let (schema_cache, error_receiver) = SchemaCache::new(config.schema_registry_addr).await?;
     tokio::spawn(async move {

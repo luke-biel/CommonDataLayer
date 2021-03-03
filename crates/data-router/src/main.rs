@@ -14,9 +14,11 @@ use utils::{
 use utils::{
     message_types::BorrowedInsertMessage,
     messaging_system::{
-        consumer::CommonConsumer, message::CommunicationMessage, publisher::CommonPublisher,
+        consumer::CommonConsumer, get_order_group_id, message::CommunicationMessage,
+        publisher::CommonPublisher,
     },
     metrics::{self, counter},
+    parallel_task_queue::ParallelTaskQueue,
     task_limiter::TaskLimiter,
 };
 
@@ -50,10 +52,10 @@ struct Config {
     pub schema_registry_addr: String,
     #[structopt(long, env)]
     pub cache_capacity: usize,
-    #[structopt(long, env)]
-    pub monotasking: bool,
-    #[structopt(long = "task-limit", env = "TASK_LIMIT", default_value = "128")]
+    #[structopt(long, env, default_value = "128")]
     pub task_limit: usize,
+    #[structopt(default_value = metrics::DEFAULT_PORT, env)]
+    pub metrics_port: u16,
 }
 
 #[tokio::main]
@@ -63,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
 
     debug!("Environment {:?}", config);
 
-    metrics::serve();
+    metrics::serve(config.metrics_port);
 
     let consumer = new_consumer(&config, &config.input_topic_or_queue).await?;
     let producer = Arc::new(new_producer(&config).await?);
@@ -86,22 +88,27 @@ async fn main() -> anyhow::Result<()> {
 
     let error_topic_or_exchange = Arc::new(config.error_topic_or_exchange);
     let task_limiter = TaskLimiter::new(config.task_limit);
+    let task_queue = Arc::new(ParallelTaskQueue::default());
 
     while let Some(message) = message_stream.next().await {
         match message {
             Ok(message) => {
+                let task_queue = task_queue.clone();
+                let order_group_id = get_order_group_id(message.as_ref());
+
                 let future = handle_message(
                     message,
                     producer.clone(),
                     error_topic_or_exchange.clone(),
                     schema_cache.clone(),
                 );
-
-                if !config.monotasking {
-                    task_limiter.run(move || async move { future.await }).await
-                } else {
-                    future.await;
-                }
+                task_limiter
+                    .run(move || async move {
+                        let _guard = order_group_id
+                            .map(move |x| async move { task_queue.acquire_permit(x).await });
+                        future.await
+                    })
+                    .await;
             }
             Err(error) => {
                 error!("Error fetching data from message queue {:?}", error);
@@ -185,6 +192,7 @@ async fn handle_message(
 ) {
     trace!("Received message `{:?}`", message.payload());
 
+    let message_key = get_order_group_id(message.as_ref()).unwrap_or_default();
     counter!("cdl.data-router.input-msg", 1);
     let result = async {
         let json_something: Value =
@@ -200,7 +208,7 @@ async fn handle_message(
             let mut result = Ok(());
 
             for entry in maybe_array.iter() {
-                let r = route(&entry, &producer, &schema_cache)
+                let r = route(&entry, &message_key, &producer, &schema_cache)
                     .await
                     .context("Tried to send message and failed");
 
@@ -220,7 +228,7 @@ async fn handle_message(
                 message.payload()?,
             )
             .context("Payload deserialization failed, message is not a valid cdl message")?;
-            let result = route(&owned, &producer, &schema_cache)
+            let result = route(&owned, &message_key, &producer, &schema_cache)
                 .await
                 .context("Tried to send message and failed");
             counter!("cdl.data-router.input-singlemsg", 1);
@@ -262,12 +270,12 @@ async fn handle_message(
 
 async fn route(
     event: &DataRouterInsertMessage<'_>,
+    message_key: &str,
     producer: &CommonPublisher,
     schema_cache: &SchemaCache,
 ) -> anyhow::Result<()> {
     let payload = BorrowedInsertMessage {
         object_id: event.object_id,
-        order_group_id: event.order_group_id,
         schema_id: event.schema_id,
         timestamp: current_timestamp(),
         data: event.data,
@@ -277,12 +285,11 @@ async fn route(
         .get_schema(event.schema_id)
         .await
         .context("failed to get schema metadata")?;
-    let key = payload.object_id.to_string();
 
     send_message(
         producer,
         &schema.topic_or_queue,
-        &key,
+        message_key,
         serde_json::to_vec(&payload)?,
     )
     .await;

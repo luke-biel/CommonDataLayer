@@ -15,6 +15,8 @@ struct Config {
     pub db_url: String,
     pub export_dir: Option<PathBuf>,
     pub import_file: Option<PathBuf>,
+
+    pub metrics_port: Option<u16>,
 }
 
 #[tokio::main]
@@ -23,7 +25,11 @@ pub async fn main() -> anyhow::Result<()> {
     let config = envy::from_env::<Config>().context("Env vars not set correctly")?;
 
     status_endpoints::serve();
-    metrics::serve();
+    metrics::serve(
+        config
+            .metrics_port
+            .unwrap_or_else(|| metrics::DEFAULT_PORT.parse().unwrap()),
+    );
 
     let registry = SchemaRegistryDb::new(config.db_url).await?;
 
