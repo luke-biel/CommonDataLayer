@@ -1,16 +1,17 @@
 use crate::types::VersionedUuid;
 use semver::Version;
 use thiserror::Error;
+use tonic::Status;
 use uuid::Uuid;
 
 #[derive(Debug, Error)]
 pub enum RegistryError {
-    #[error("No schema found with id \"{0}\"")]
-    NoSchemaWithId(Uuid),
-    #[error("Error occurred while accessing database: {0}")]
-    DbError(sqlx::Error),
     #[error("Unable to connect to database: {0}")]
     ConnectionError(sqlx::Error),
+    #[error("Error occurred while accessing database: {0}")]
+    DbError(sqlx::Error),
+    #[error("No schema found with id \"{0}\"")]
+    NoSchemaWithId(Uuid),
     #[error("Given schema type is invalid")]
     InvalidSchemaType,
     #[error("Invalid version retrieved from database: {0}")]
@@ -29,6 +30,10 @@ pub enum RegistryError {
     InvalidData(Vec<String>),
     #[error("Invalid JSON schema: {0}")]
     InvalidJsonSchema(jsonschema::CompilationError),
+    #[error("Error receiving notification from database: {0}")]
+    NotificationError(sqlx::Error),
+    #[error("Malformed notification payload: {0}")]
+    MalformedNotification(serde_json::Error),
 }
 
 pub type RegistryResult<T> = Result<T, RegistryError>;
@@ -46,3 +51,37 @@ impl From<sqlx::Error> for RegistryError {
         RegistryError::DbError(error)
     }
 }
+
+impl From<RegistryError> for Status {
+    fn from(error: RegistryError) -> Status {
+        match error {
+            RegistryError::NoSchemaWithId(_) => Status::not_found(error.to_string()),
+            RegistryError::InvalidSchemaType
+            | RegistryError::NewVersionMustBeGreatest { .. }
+            | RegistryError::InvalidVersion(_)
+            | RegistryError::NoVersionMatchesRequirement(_)
+            | RegistryError::InvalidData(_)
+            | RegistryError::InvalidJsonSchema(_) => Status::invalid_argument(error.to_string()),
+            RegistryError::ConnectionError(_)
+            | RegistryError::DbError(_)
+            | RegistryError::NotificationError(_)
+            | RegistryError::MalformedNotification(_) => Status::internal(error.to_string()),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum CacheError {
+    #[error("Failed to connect to schema registry: {0}")]
+    ConnectionError(rpc::error::ClientError),
+    #[error("Error returned from schema registry: {0}")]
+    RegistryError(tonic::Status),
+    #[error("Missing schema")]
+    MissingSchema,
+    #[error("Malformed schema")]
+    MalformedSchema,
+    #[error("Failed to receive schema update: {0}")]
+    SchemaUpdateReceiveError(tonic::Status),
+}
+
+pub type CacheResult<T> = Result<T, CacheError>;

@@ -13,13 +13,12 @@
       "nullable": []
     }
   },
-  "2897e1eccb96ae8cca7a77ef6aab4c43eeb10bc0f7cb9a8cddcd71b33fe387aa": {
-    "query": "INSERT INTO schemas(id, name, type, queue, query_addr) VALUES($1, $2, $3, $4, $5)",
+  "25b5c62d7a889dda42d988c124bee9ec09abfb15e2d66c6b57583df26858a572": {
+    "query": "UPDATE schemas SET name = $1, type = $2, topic_or_queue = $3, query_address = $4 WHERE id = $5",
     "describe": {
       "columns": [],
       "parameters": {
         "Left": [
-          "Uuid",
           "Varchar",
           {
             "Custom": {
@@ -33,7 +32,8 @@
             }
           },
           "Varchar",
-          "Varchar"
+          "Varchar",
+          "Uuid"
         ]
       },
       "nullable": []
@@ -59,8 +59,8 @@
       ]
     }
   },
-  "3ac9272ad393449397f0b44aaf25c93cba5cda05ce20c8236d5419b239237190": {
-    "query": "SELECT id, name, queue, query_addr, type as \"type: _\" FROM schemas",
+  "3e985eb4e5e3f9888d269c0794ebac00a4177e382c29e059c4bcdde6a5f7b36c": {
+    "query": "SELECT id, name, topic_or_queue, query_address, type as \"type: _\" FROM schemas WHERE id = $1",
     "describe": {
       "columns": [
         {
@@ -75,12 +75,66 @@
         },
         {
           "ordinal": 2,
-          "name": "queue",
+          "name": "topic_or_queue",
           "type_info": "Varchar"
         },
         {
           "ordinal": 3,
-          "name": "query_addr",
+          "name": "query_address",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "type: _",
+          "type_info": {
+            "Custom": {
+              "name": "schema_type",
+              "kind": {
+                "Enum": [
+                  "document_storage",
+                  "timeseries"
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "603967fb79ff02b37934817a809246a885b151ef42bc3f143e7ca1b8de2f77b0": {
+    "query": "SELECT id, name, topic_or_queue, query_address, type as \"type: _\" FROM schemas ORDER BY name",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "topic_or_queue",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "query_address",
           "type_info": "Varchar"
         },
         {
@@ -111,34 +165,8 @@
       ]
     }
   },
-  "49d2d42127582ab4aa35990f60d0bcee19517f24a2ad76051729db8452a7d583": {
-    "query": "UPDATE schemas SET name = $1, type = $2, queue = $3, query_addr = $4 WHERE id = $5",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Varchar",
-          {
-            "Custom": {
-              "name": "schema_type",
-              "kind": {
-                "Enum": [
-                  "document_storage",
-                  "timeseries"
-                ]
-              }
-            }
-          },
-          "Varchar",
-          "Varchar",
-          "Uuid"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "56b562f4c3bc721a42ee915e7fcfd26d5b83c6e7609003e0b694c0b9bd975215": {
-    "query": "SELECT id, name, queue, query_addr, type as \"type: _\" FROM schemas WHERE id = $1",
+  "77c03c86b6224317484b9b472bbb9c750faa36431eb58b7204543c5a542217dd": {
+    "query": "SELECT id, name, topic_or_queue, query_address, type as \"type: _\" FROM schemas",
     "describe": {
       "columns": [
         {
@@ -153,12 +181,12 @@
         },
         {
           "ordinal": 2,
-          "name": "queue",
+          "name": "topic_or_queue",
           "type_info": "Varchar"
         },
         {
           "ordinal": 3,
-          "name": "query_addr",
+          "name": "query_address",
           "type_info": "Varchar"
         },
         {
@@ -178,9 +206,7 @@
         }
       ],
       "parameters": {
-        "Left": [
-          "Uuid"
-        ]
+        "Left": []
       },
       "nullable": [
         false,
@@ -215,6 +241,32 @@
         false,
         false
       ]
+    }
+  },
+  "aa6c1d5aae8899326e87bf6c3301dc359c43cd9c30c27e05f9aa796f948cbd93": {
+    "query": "INSERT INTO schemas(id, name, type, topic_or_queue, query_address) VALUES($1, $2, $3, $4, $5)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Varchar",
+          {
+            "Custom": {
+              "name": "schema_type",
+              "kind": {
+                "Enum": [
+                  "document_storage",
+                  "timeseries"
+                ]
+              }
+            }
+          },
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": []
     }
   },
   "ae1ae494dfd5fded571f046d9dcda3692d58e30536ba13c312c6a69093d9d27e": {
@@ -254,58 +306,6 @@
         ]
       },
       "nullable": [
-        false
-      ]
-    }
-  },
-  "b95439e39cea0f259edafc05542d656d5426f472b1c7c7e434aa15b4523abe5d": {
-    "query": "SELECT id, name, queue, query_addr, type as \"type: _\" FROM schemas ORDER BY name",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "queue",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "query_addr",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "type: _",
-          "type_info": {
-            "Custom": {
-              "name": "schema_type",
-              "kind": {
-                "Enum": [
-                  "document_storage",
-                  "timeseries"
-                ]
-              }
-            }
-          }
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
         false
       ]
     }

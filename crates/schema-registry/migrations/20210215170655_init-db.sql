@@ -1,23 +1,19 @@
 -- add migration script here
 
-DROP TABLE IF EXISTS schemas;
-DROP TABLE IF EXISTS definitions;
-DROP TABLE IF EXISTS views;
-
 CREATE TYPE schema_type AS ENUM ('document_storage', 'timeseries');
 
-CREATE TABLE IF NOT EXISTS schemas (
-    id         uuid primary key not null,
-    name       varchar not null,
-    type       schema_type not null,
-    queue      varchar not null,
-    query_addr varchar not null
+CREATE TABLE schemas (
+    id             uuid primary key not null,
+    name           varchar not null,
+    type           schema_type not null,
+    topic_or_queue varchar not null,
+    query_address  varchar not null
 );
 
-CREATE TABLE IF NOT EXISTS definitions (
-    version varchar not null,
+CREATE TABLE definitions (
+    version    varchar not null,
     definition json not null,
-    schema uuid not null,
+    schema     uuid not null,
 
     PRIMARY KEY(schema, version),
     CONSTRAINT fk_schema_1
@@ -26,14 +22,20 @@ CREATE TABLE IF NOT EXISTS definitions (
         ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS views (
-    id       uuid primary key not null,
-    name     varchar not null,
-    jmespath varchar not null,
-    schema   uuid not null,
+-- Notify when a row updates
+CREATE OR REPLACE FUNCTION notify_row_updated()
+    RETURNS trigger AS $$
+DECLARE
+    channel text := TG_ARGV[0];
+BEGIN
+    PERFORM pg_notify(
+        channel,
+        row_to_json(NEW)::text);
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
 
-    CONSTRAINT fk_schema_2
-        FOREIGN KEY(schema)
-        REFERENCES schemas(id) 
-        ON DELETE CASCADE
-);
+CREATE TRIGGER notify_schema_updated
+    AFTER UPDATE ON schemas
+    FOR EACH ROW
+    EXECUTE PROCEDURE notify_row_updated('schemas');
