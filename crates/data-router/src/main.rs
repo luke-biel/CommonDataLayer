@@ -1,18 +1,17 @@
 use anyhow::Context;
 use log::{debug, error, trace};
-use schema_registry::types::Schema;
-use schema_registry::watcher::DbWatcher;
+use schema_registry::cache::SchemaCache;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{
-    process,
-    sync::{Arc, Mutex},
-};
+use std::{process, sync::Arc};
 use structopt::{clap::arg_enum, StructOpt};
 use tokio::pin;
 use tokio::stream::StreamExt;
 use utils::{
-    abort_on_poison,
+    current_timestamp, message_types::DataRouterInsertMessage,
+    messaging_system::consumer::CommonConsumerConfig,
+};
+use utils::{
     message_types::BorrowedInsertMessage,
     messaging_system::{
         consumer::CommonConsumer, message::CommunicationMessage, publisher::CommonPublisher,
@@ -20,11 +19,6 @@ use utils::{
     metrics::{self, counter},
     task_limiter::TaskLimiter,
 };
-use utils::{
-    current_timestamp, message_types::DataRouterInsertMessage,
-    messaging_system::consumer::CommonConsumerConfig,
-};
-use uuid::Uuid;
 
 const SERVICE_NAME: &str = "data-router";
 
@@ -74,14 +68,23 @@ async fn main() -> anyhow::Result<()> {
     let consumer = new_consumer(&config, &config.input_topic_or_queue).await?;
     let producer = Arc::new(new_producer(&config).await?);
 
-    let cache = Arc::new(Mutex::new(LruCache::new(config.cache_capacity)));
+    let (schema_cache, error_receiver) = SchemaCache::new(config.schema_registry_addr)
+        .await
+        .context("Failed to create schema cache")?;
+    tokio::spawn(async move {
+        if let Ok(error) = error_receiver.await {
+            panic!(
+                "Schema Cache encountered an error, restarting to avoid sync issues: {}",
+                error
+            );
+        }
+    });
+
     let consumer = consumer.leak();
     let message_stream = consumer.consume().await;
     pin!(message_stream);
 
     let error_topic_or_exchange = Arc::new(config.error_topic_or_exchange);
-    let schema_cache = DbWatcher::watch_schemas(config.schema_registry_addr);
-
     let task_limiter = TaskLimiter::new(config.task_limit);
 
     while let Some(message) = message_stream.next().await {
@@ -89,7 +92,6 @@ async fn main() -> anyhow::Result<()> {
             Ok(message) => {
                 let future = handle_message(
                     message,
-                    cache.clone(),
                     producer.clone(),
                     error_topic_or_exchange.clone(),
                     schema_cache.clone(),
@@ -177,10 +179,9 @@ async fn new_consumer(config: &Config, topic_or_queue: &str) -> anyhow::Result<C
 
 async fn handle_message(
     message: Box<dyn CommunicationMessage>,
-    cache: Arc<Mutex<LruCache<Uuid, String>>>,
     producer: Arc<CommonPublisher>,
     error_topic_or_exchange: Arc<String>,
-    schema_registry_addr: Arc<String>,
+    schema_cache: SchemaCache,
 ) {
     trace!("Received message `{:?}`", message.payload());
 
@@ -199,7 +200,7 @@ async fn handle_message(
             let mut result = Ok(());
 
             for entry in maybe_array.iter() {
-                let r = route(&cache, &entry, &producer, &schema_registry_addr)
+                let r = route(&entry, &producer, &schema_cache)
                     .await
                     .context("Tried to send message and failed");
 
@@ -219,7 +220,7 @@ async fn handle_message(
                 message.payload()?,
             )
             .context("Payload deserialization failed, message is not a valid cdl message")?;
-            let result = route(&cache, &owned, &producer, &schema_registry_addr)
+            let result = route(&owned, &producer, &schema_cache)
                 .await
                 .context("Tried to send message and failed");
             counter!("cdl.data-router.input-singlemsg", 1);
@@ -260,10 +261,9 @@ async fn handle_message(
 }
 
 async fn route(
-    cache: &Mutex<LruCache<Uuid, String>>,
     event: &DataRouterInsertMessage<'_>,
     producer: &CommonPublisher,
-    schema_cache: DbWatcher<Schema, Uuid>,
+    schema_cache: &SchemaCache,
 ) -> anyhow::Result<()> {
     let payload = BorrowedInsertMessage {
         object_id: event.object_id,
@@ -273,16 +273,19 @@ async fn route(
         data: event.data,
     };
 
-    let schema_topic = schema_cache
-        .get(event.schema_id)
-        .ok_or_else(|| anyhow::anyhow!("No schema found with ID {}", event.schema_id))?
-        .read()
-        .unwrap()
-        .queue
-        .clone();
+    let schema = schema_cache
+        .get_schema(event.schema_id)
+        .await
+        .context("failed to get schema metadata")?;
     let key = payload.object_id.to_string();
 
-    send_message(producer, &schema_topic, &key, serde_json::to_vec(&payload)?).await;
+    send_message(
+        producer,
+        &schema.topic_or_queue,
+        &key,
+        serde_json::to_vec(&payload)?,
+    )
+    .await;
     Ok(())
 }
 
