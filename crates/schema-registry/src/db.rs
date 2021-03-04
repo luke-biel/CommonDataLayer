@@ -7,7 +7,6 @@ use crate::{
     types::DbExport,
 };
 use log::{trace, warn};
-use rpc::schema_registry::types::SchemaType;
 use semver::Version;
 use serde_json::Value;
 use sqlx::postgres::{PgListener, PgPool, PgPoolOptions};
@@ -15,7 +14,7 @@ use sqlx::{Acquire, Connection};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 use uuid::Uuid;
 
-const SCHEMAS_LISTEN_CHANNEL: &'static str = "schemas";
+const SCHEMAS_LISTEN_CHANNEL: &str = "schemas";
 
 pub struct SchemaRegistryDb {
     pool: PgPool,
@@ -185,7 +184,7 @@ impl SchemaRegistryDb {
                          VALUES($1, $2, $3, $4, $5)",
                         &new_id,
                         &schema.name,
-                        &schema.r#type as &SchemaType,
+                        &schema.r#type as &rpc::schema_registry::types::SchemaType,
                         &schema.topic_or_queue,
                         &schema.query_address,
                     )
