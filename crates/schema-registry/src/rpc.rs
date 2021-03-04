@@ -111,7 +111,7 @@ impl SchemaRegistry for SchemaRegistryDb {
         let versioned_id = VersionedUuid {
             id: parse_uuid(&request.id)?,
             version_req: parse_optional_version_req(&request.version_req)?
-                .unwrap_or_else(|| VersionReq::any()),
+                .unwrap_or_else(VersionReq::any),
         };
 
         let (version, definition) = self.get_schema_definition(&versioned_id).await?;
@@ -232,7 +232,7 @@ impl SchemaRegistry for SchemaRegistryDb {
         let versioned_id = VersionedUuid {
             id: parse_uuid(&request.schema_id.id)?,
             version_req: parse_optional_version_req(&request.schema_id.version_req)?
-                .unwrap_or_else(|| VersionReq::any()),
+                .unwrap_or_else(VersionReq::any),
         };
         let json = parse_json(&request.value)?;
 

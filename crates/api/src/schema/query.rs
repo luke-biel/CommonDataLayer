@@ -43,7 +43,7 @@ impl SchemaWithDefinitions {
         let version_req = VersionReq::parse(&version_req)?;
         let definition = self
             .get_definition(version_req)
-            .ok_or_else(|| "No definition matches the given requirement")?;
+            .ok_or("No definition matches the given requirement")?;
 
         Ok(definition)
     }
