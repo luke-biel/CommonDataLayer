@@ -43,7 +43,7 @@ RUN --mount=type=cache,mode=0755,target=/root/.cargo/registry \
     then CARGO_ARGS="--out-dir=output -Z unstable-options --profile ci"; \
     else CARGO_ARGS="--out-dir=output -Z unstable-options --release"; \
     fi && \
-    LIB_LDFLAGS=-L/usr/lib/x86_64-linux-gnu CFLAGS=-I/usr/local/musl/include CC=musl-gcc CXX=g++ \
+    SQLX_OFFLINE=true LIB_LDFLAGS=-L/usr/lib/x86_64-linux-gnu CFLAGS=-I/usr/local/musl/include CC=musl-gcc CXX=g++ \
     cargo build $CARGO_ARGS --workspace
 
 RUN if [ "$ENV" != "DEV" ]; \
