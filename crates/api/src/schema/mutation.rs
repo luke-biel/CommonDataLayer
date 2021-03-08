@@ -27,7 +27,7 @@ impl Mutation {
                     topic_or_queue: new.topic_or_queue,
                     query_address: new.query_address,
                 },
-                definition: rmp_serde::to_vec(&serde_json::from_str::<Value>(&new.definition)?)?,
+                definition: serde_json::to_vec(&serde_json::from_str::<Value>(&new.definition)?)?,
             })
             .await?
             .into_inner()
@@ -57,7 +57,7 @@ impl Mutation {
             id: schema_id.to_string(),
             definition: rpc::schema_registry::SchemaDefinition {
                 version: new_version.version.clone(),
-                definition: rmp_serde::to_vec(&serde_json::from_str::<Value>(
+                definition: serde_json::to_vec(&serde_json::from_str::<Value>(
                     &new_version.definition,
                 )?)?,
             },

@@ -293,7 +293,7 @@ fn parse_version(req: &str) -> Result<Version, Status> {
 }
 
 fn parse_json(json: &[u8]) -> Result<Value, Status> {
-    rmp_serde::from_slice(json)
+    serde_json::from_slice(json)
         .map_err(|err| Status::invalid_argument(format!("Invalid JSON provided: {}", err)))
 }
 
@@ -303,6 +303,6 @@ fn parse_uuid(id: &str) -> Result<Uuid, Status> {
 }
 
 fn serialize_json(json: &Value) -> Result<Vec<u8>, Status> {
-    rmp_serde::to_vec(json)
+    serde_json::to_vec(json)
         .map_err(|err| Status::internal(format!("Unable to serialize JSON: {}", err)))
 }

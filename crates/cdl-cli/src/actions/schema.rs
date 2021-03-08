@@ -24,7 +24,7 @@ pub async fn get_schema_definition(
 
     println!(
         "{:#}",
-        rmp_serde::from_slice::<Value>(&response.into_inner().definition)?
+        serde_json::from_slice::<Value>(&response.into_inner().definition)?
     );
 
     Ok(())
@@ -49,7 +49,7 @@ pub async fn add_schema(
                 topic_or_queue,
                 r#type: r#type.into(),
             },
-            definition: rmp_serde::to_vec(&definition)?,
+            definition: serde_json::to_vec(&definition)?,
         })
         .await?;
 
@@ -122,7 +122,7 @@ pub async fn add_schema_version(
         id: schema_id.to_string(),
         definition: SchemaDefinition {
             version: version.to_string(),
-            definition: rmp_serde::to_vec(&definition)?,
+            definition: serde_json::to_vec(&definition)?,
         },
     };
 
@@ -180,7 +180,7 @@ pub async fn validate_value(
                 id: schema_id.to_string(),
                 version_req: version_req.map(|v| v.to_string()),
             },
-            value: rmp_serde::to_vec(&value)?,
+            value: serde_json::to_vec(&value)?,
         })
         .await?
         .into_inner()

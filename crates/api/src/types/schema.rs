@@ -66,7 +66,7 @@ impl SchemaWithDefinitions {
                 .map(|definition| {
                     Ok(Definition {
                         version: definition.version,
-                        definition: serde_json::to_string(&rmp_serde::from_slice::<Value>(
+                        definition: serde_json::to_string(&serde_json::from_slice::<Value>(
                             &definition.definition,
                         )?)?,
                     })
