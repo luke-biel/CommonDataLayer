@@ -31,7 +31,7 @@ impl SchemaCache {
         let schemas2 = Arc::clone(&schemas);
 
         tokio::spawn(async move {
-            'receive: loop {
+            loop {
                 let message = schema_updates
                     .message()
                     .await
@@ -47,15 +47,15 @@ impl SchemaCache {
                         }
                         Err(error) => {
                             tx.send(error).ok();
-                            break 'receive;
+                            break;
                         }
                     },
                     Ok(None) => {
-                        break 'receive;
+                        break;
                     }
                     Err(error) => {
                         tx.send(error).ok();
-                        break 'receive;
+                        break;
                     }
                 }
             }
