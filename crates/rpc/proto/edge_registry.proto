@@ -1,0 +1,24 @@
+syntax = "proto2";
+package edge_registry;
+
+service EdgeRegistry {
+  rpc AddEdges(NewEdgesMessage) returns (Empty);
+  rpc GetRelatedVertices(Vertex) returns (VertexList);
+}
+
+message NewEdgesMessage {
+  required string object_id = 1;
+  required string schema_id = 2;
+  repeated Vertex relatives = 3;
+}
+
+message VertexList {
+  repeated Vertex items = 1;
+}
+
+message Vertex {
+  required string object_id = 1;
+  required string schema_id = 2;
+}
+
+message Empty {}

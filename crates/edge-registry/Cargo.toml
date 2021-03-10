@@ -1,0 +1,22 @@
+[package]
+name = "edge-registry"
+version = "0.1.0"
+authors = ["Łukasz Biel <lukasz.p.biel@gmail.com>"]
+edition = "2018"
+
+[[bin]]
+name = "edge-registry"
+path = "src/main.rs"
+
+[lib]
+name = "edge_registry"
+path = "src/lib.rs"
+
+[dependencies]
+bb8-postgres = { version = "0.4.0", features = ["with-uuid-0_8"] }
+tokio = { version = "0.2.24", features = ["rt-threaded", "macros", "sync"] }
+rpc = { path = "../rpc" }
+tonic = "0.3.0"
+structopt = "0.3.21"
+uuid = "0.8.2"
+itertools = "0.10.0"
