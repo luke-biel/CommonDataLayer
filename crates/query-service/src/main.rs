@@ -9,8 +9,12 @@ use utils::metrics;
 pub struct Config {
     #[structopt(subcommand)]
     pub inner: ConfigType,
+    /// Port to listen on
     #[structopt(long, env)]
     pub input_port: u16,
+    /// Port to listen on for Prometheus requests
+    #[structopt(default_value = metrics::DEFAULT_PORT, env)]
+    pub metrics_port: u16,
 }
 
 #[derive(StructOpt)]
@@ -34,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
 
     let config: Config = Config::from_args();
 
-    metrics::serve();
+    metrics::serve(config.metrics_port);
 
     match config.inner {
         ConfigType::Postgres(psql_config) => {

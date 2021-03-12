@@ -11,12 +11,18 @@ pub mod handler;
 
 #[derive(StructOpt)]
 struct Config {
+    /// Address of schema registry gRPC API
     #[structopt(long, env = "SCHEMA_REGISTRY_ADDR")]
     schema_registry_addr: String,
+    /// How many entries the cache can hold
     #[structopt(long, env = "CACHE_CAPACITY")]
     cache_capacity: usize,
+    /// Port to listen on
     #[structopt(long, env = "INPUT_PORT")]
     input_port: u16,
+    /// Port to listen on for Prometheus requests
+    #[structopt(default_value = metrics::DEFAULT_PORT, env)]
+    pub metrics_port: u16,
 }
 
 #[tokio::main]
@@ -25,7 +31,7 @@ async fn main() {
 
     let config = Config::from_args();
 
-    metrics::serve();
+    metrics::serve(config.metrics_port);
 
     let schema_registry_cache = Arc::new(SchemaRegistryCache::new(
         config.schema_registry_addr,

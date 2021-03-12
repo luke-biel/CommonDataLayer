@@ -1,62 +1,78 @@
 use anyhow::Context;
+use async_trait::async_trait;
 use log::{debug, error, trace};
 use lru_cache::LruCache;
 use rpc::schema_registry::Id;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
+    net::{Ipv4Addr, SocketAddrV4},
     process,
     sync::{Arc, Mutex},
 };
 use structopt::{clap::arg_enum, StructOpt};
-use tokio::pin;
-use tokio::stream::StreamExt;
 use utils::{
     abort_on_poison,
-    message_types::BorrowedInsertMessage,
-    messaging_system::{
-        consumer::CommonConsumer, message::CommunicationMessage, publisher::CommonPublisher,
+    communication::{
+        get_order_group_id,
+        message::CommunicationMessage,
+        parallel_consumer::{
+            ParallelCommonConsumer, ParallelCommonConsumerConfig, ParallelConsumerHandler,
+        },
+        publisher::CommonPublisher,
     },
+    message_types::BorrowedInsertMessage,
     metrics::{self, counter},
+    parallel_task_queue::ParallelTaskQueue,
+    task_limiter::TaskLimiter,
 };
-use utils::{
-    current_timestamp, message_types::DataRouterInsertMessage,
-    messaging_system::consumer::CommonConsumerConfig,
-};
+use utils::{current_timestamp, message_types::DataRouterInsertMessage};
 use uuid::Uuid;
-
-const SERVICE_NAME: &str = "data-router";
 
 arg_enum! {
     #[derive(Deserialize, Debug, Serialize)]
-    enum MessageQueueKind {
+    enum CommunicationMethod {
         Kafka,
-        Amqp
+        Amqp,
+        Grpc
     }
 }
 
 #[derive(StructOpt, Deserialize, Debug, Serialize)]
 struct Config {
-    #[structopt(long, env, possible_values = &MessageQueueKind::variants(), case_insensitive = true)]
-    pub message_queue: MessageQueueKind,
+    /// The method of communication with external services
+    #[structopt(long, env, possible_values = &CommunicationMethod::variants(), case_insensitive = true)]
+    pub communication_method: CommunicationMethod,
+    /// Address of Kafka brokers
     #[structopt(long, env)]
     pub kafka_brokers: Option<String>,
+    /// Group ID of the consumer
     #[structopt(long, env)]
     pub kafka_group_id: Option<String>,
+    /// Connection URL to AMQP Server
     #[structopt(long, env)]
     pub amqp_connection_string: Option<String>,
+    /// Consumer tag
     #[structopt(long, env)]
     pub amqp_consumer_tag: Option<String>,
+    /// Kafka topic or AMQP queue
     #[structopt(long, env)]
-    pub input_topic_or_queue: String,
-    #[structopt(long, env)]
-    pub error_topic_or_exchange: String,
+    pub input_source: Option<String>,
+    /// Address of schema registry gRPC API
     #[structopt(long, env)]
     pub schema_registry_addr: String,
+    /// How many entries the cache can hold
     #[structopt(long, env)]
     pub cache_capacity: usize,
+    /// Max requests handled in parallel
+    #[structopt(long, env, default_value = "128")]
+    pub task_limit: usize,
+    /// Port to listen on for Prometheus requests
+    #[structopt(default_value = metrics::DEFAULT_PORT, env)]
+    pub metrics_port: u16,
+    /// Port to listen on when communication method is `grpc`
     #[structopt(long, env)]
-    pub monotasking: bool,
+    pub grpc_port: Option<u16>,
 }
 
 #[tokio::main]
@@ -66,70 +82,151 @@ async fn main() -> anyhow::Result<()> {
 
     debug!("Environment {:?}", config);
 
-    metrics::serve();
+    metrics::serve(config.metrics_port);
 
-    let consumer = new_consumer(&config, &config.input_topic_or_queue).await?;
+    let consumer = new_consumer(&config).await?;
     let producer = Arc::new(new_producer(&config).await?);
 
     let cache = Arc::new(Mutex::new(LruCache::new(config.cache_capacity)));
-    let consumer = consumer.leak();
-    let message_stream = consumer.consume().await;
-    pin!(message_stream);
 
-    let error_topic_or_exchange = Arc::new(config.error_topic_or_exchange);
     let schema_registry_addr = Arc::new(config.schema_registry_addr);
 
-    while let Some(message) = message_stream.next().await {
-        match message {
-            Ok(message) => {
-                let future = handle_message(
-                    message,
-                    cache.clone(),
-                    producer.clone(),
-                    error_topic_or_exchange.clone(),
-                    schema_registry_addr.clone(),
-                );
+    let task_queue = Arc::new(ParallelTaskQueue::default());
 
-                if !config.monotasking {
-                    tokio::spawn(future);
-                } else {
-                    future.await;
-                }
-            }
-            Err(error) => {
-                error!("Error fetching data from message queue {:?}", error);
-                // no error handling necessary - message won't be acked - it was never delivered properly
-            }
-        };
-    }
+    consumer
+        .par_run(Handler {
+            cache,
+            producer,
+            schema_registry_addr,
+            task_queue,
+        })
+        .await?;
 
     tokio::time::delay_for(tokio::time::Duration::from_secs(3)).await;
 
     Ok(())
 }
 
+struct Handler {
+    cache: Arc<Mutex<LruCache<Uuid, String>>>,
+    producer: Arc<CommonPublisher>,
+    schema_registry_addr: Arc<String>,
+    task_queue: Arc<ParallelTaskQueue>,
+}
+
+#[async_trait]
+impl ParallelConsumerHandler for Handler {
+    async fn handle<'a>(&'a self, message: &'a dyn CommunicationMessage) -> anyhow::Result<()> {
+        let order_group_id = get_order_group_id(message);
+        let _guard =
+            order_group_id.map(move |x| async move { self.task_queue.acquire_permit(x).await });
+
+        trace!(
+            "Received message ({:?}) `{:?}`",
+            message.key(),
+            message.payload()
+        );
+
+        let message_key = get_order_group_id(message).unwrap_or_default();
+        counter!("cdl.data-router.input-msg", 1);
+        let result = async {
+            let json_something: Value = serde_json::from_str(message.payload()?)
+                .context("Payload deserialization failed")?;
+            if json_something.is_array() {
+                trace!("Processing multimessage");
+
+                let maybe_array: Vec<DataRouterInsertMessage> = serde_json::from_str(
+                    message.payload()?,
+                )
+                .context("Payload deserialization failed, message is not a valid cdl message ")?;
+
+                let mut result = Ok(());
+
+                for entry in maybe_array.iter() {
+                    let r = route(
+                        &self.cache,
+                        &entry,
+                        &message_key,
+                        &self.producer,
+                        &self.schema_registry_addr,
+                    )
+                    .await
+                    .context("Tried to send message and failed");
+
+                    counter!("cdl.data-router.input-multimsg", 1);
+                    counter!("cdl.data-router.processed", 1);
+
+                    if r.is_err() {
+                        result = r;
+                    }
+                }
+
+                result
+            } else {
+                trace!("Processing single message");
+
+                let owned: DataRouterInsertMessage =
+                    serde_json::from_str::<DataRouterInsertMessage>(message.payload()?).context(
+                        "Payload deserialization failed, message is not a valid cdl message",
+                    )?;
+                let result = route(
+                    &self.cache,
+                    &owned,
+                    &message_key,
+                    &self.producer,
+                    &self.schema_registry_addr,
+                )
+                .await
+                .context("Tried to send message and failed");
+                counter!("cdl.data-router.input-singlemsg", 1);
+                counter!("cdl.data-router.processed", 1);
+
+                result
+            }
+        }
+        .await;
+
+        counter!("cdl.data-router.input-request", 1);
+
+        if let Err(error) = result {
+            counter!("cdl.data-router.error", 1);
+
+            return Err(error);
+        } else {
+            counter!("cdl.data-router.success", 1);
+        }
+
+        Ok(())
+    }
+}
+
 async fn new_producer(config: &Config) -> anyhow::Result<CommonPublisher> {
-    Ok(match config.message_queue {
-        MessageQueueKind::Kafka => {
+    Ok(match config.communication_method {
+        CommunicationMethod::Kafka => {
             let brokers = config
                 .kafka_brokers
                 .as_ref()
                 .context("kafka brokers were not specified")?;
             CommonPublisher::new_kafka(brokers).await?
         }
-        MessageQueueKind::Amqp => {
+        CommunicationMethod::Amqp => {
             let connection_string = config
                 .amqp_connection_string
                 .as_ref()
                 .context("amqp connection string was not specified")?;
             CommonPublisher::new_amqp(connection_string).await?
         }
+        CommunicationMethod::Grpc => CommonPublisher::new_grpc("command_service").await?,
     })
 }
 
-async fn new_consumer(config: &Config, topic_or_queue: &str) -> anyhow::Result<CommonConsumer> {
-    let config = match config.message_queue {
-        MessageQueueKind::Kafka => {
+async fn new_consumer(config: &Config) -> anyhow::Result<ParallelCommonConsumer> {
+    let config = match config.communication_method {
+        CommunicationMethod::Kafka => {
+            let topic = config
+                .input_source
+                .as_ref()
+                .context("kafka topic was not specified")?;
             let brokers = config
                 .kafka_brokers
                 .as_ref()
@@ -141,13 +238,18 @@ async fn new_consumer(config: &Config, topic_or_queue: &str) -> anyhow::Result<C
 
             debug!("Initializing Kafka consumer");
 
-            CommonConsumerConfig::Kafka {
+            ParallelCommonConsumerConfig::Kafka {
                 brokers: &brokers,
                 group_id: &group_id,
-                topic: topic_or_queue,
+                task_limiter: TaskLimiter::new(config.task_limit),
+                topic,
             }
         }
-        MessageQueueKind::Amqp => {
+        CommunicationMethod::Amqp => {
+            let queue_name = config
+                .input_source
+                .as_ref()
+                .context("amqp queue name was not specified")?;
             let connection_string = config
                 .amqp_connection_string
                 .as_ref()
@@ -159,118 +261,49 @@ async fn new_consumer(config: &Config, topic_or_queue: &str) -> anyhow::Result<C
 
             debug!("Initializing Amqp consumer");
 
-            CommonConsumerConfig::Amqp {
+            ParallelCommonConsumerConfig::Amqp {
                 connection_string: &connection_string,
+                task_limiter: TaskLimiter::new(config.task_limit),
                 consumer_tag: &consumer_tag,
-                queue_name: topic_or_queue,
+                queue_name,
                 options: None,
             }
         }
-    };
-    Ok(CommonConsumer::new(config).await?)
-}
+        CommunicationMethod::Grpc => {
+            let port = config
+                .grpc_port
+                .clone()
+                .context("grpc port was not specified")?;
 
-async fn handle_message(
-    message: Box<dyn CommunicationMessage>,
-    cache: Arc<Mutex<LruCache<Uuid, String>>>,
-    producer: Arc<CommonPublisher>,
-    error_topic_or_exchange: Arc<String>,
-    schema_registry_addr: Arc<String>,
-) {
-    trace!("Received message `{:?}`", message.payload());
-
-    counter!("cdl.data-router.input-msg", 1);
-    let result = async {
-        let json_something: Value =
-            serde_json::from_str(message.payload()?).context("Payload deserialization failed")?;
-        if json_something.is_array() {
-            trace!("Processing multimessage");
-
-            let maybe_array: Vec<DataRouterInsertMessage> = serde_json::from_str(
-                message.payload()?,
-            )
-            .context("Payload deserialization failed, message is not a valid cdl message ")?;
-
-            let mut result = Ok(());
-
-            for entry in maybe_array.iter() {
-                let r = route(&cache, &entry, &producer, &schema_registry_addr)
-                    .await
-                    .context("Tried to send message and failed");
-
-                counter!("cdl.data-router.input-multimsg", 1);
-                counter!("cdl.data-router.processed", 1);
-
-                if r.is_err() {
-                    result = r;
-                }
-            }
-
-            result
-        } else {
-            trace!("Processing single message");
-
-            let owned: DataRouterInsertMessage = serde_json::from_str::<DataRouterInsertMessage>(
-                message.payload()?,
-            )
-            .context("Payload deserialization failed, message is not a valid cdl message")?;
-            let result = route(&cache, &owned, &producer, &schema_registry_addr)
-                .await
-                .context("Tried to send message and failed");
-            counter!("cdl.data-router.input-singlemsg", 1);
-            counter!("cdl.data-router.processed", 1);
-
-            result
+            let addr = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), port);
+            ParallelCommonConsumerConfig::Grpc { addr }
         }
-    }
-    .await;
-
-    counter!("cdl.data-router.input-request", 1);
-
-    if let Err(error) = result {
-        counter!("cdl.data-router.error", 1);
-        error!("{:?}", error);
-        send_message(
-            producer.as_ref(),
-            &error_topic_or_exchange,
-            SERVICE_NAME,
-            format!("{:?}", error).into(),
-        )
-        .await;
-    } else {
-        counter!("cdl.data-router.success", 1);
-    }
-
-    let ack_result = message.ack().await;
-
-    trace!("Message acknowledged");
-
-    if let Err(e) = ack_result {
-        error!(
-            "Fatal error, delivery status for message not received. {:?}",
-            e
-        );
-        process::abort();
-    }
+    };
+    Ok(ParallelCommonConsumer::new(config).await?)
 }
 
 async fn route(
     cache: &Mutex<LruCache<Uuid, String>>,
     event: &DataRouterInsertMessage<'_>,
+    message_key: &str,
     producer: &CommonPublisher,
     schema_registry_addr: &str,
 ) -> anyhow::Result<()> {
     let payload = BorrowedInsertMessage {
         object_id: event.object_id,
-        order_group_id: event.order_group_id,
         schema_id: event.schema_id,
         timestamp: current_timestamp(),
         data: event.data,
     };
     let topic_name = get_schema_topic(&cache, payload.schema_id, &schema_registry_addr).await?;
 
-    let key = payload.object_id.to_string();
-    send_message(producer, &topic_name, &key, serde_json::to_vec(&payload)?).await;
+    send_message(
+        producer,
+        &topic_name,
+        message_key,
+        serde_json::to_vec(&payload)?,
+    )
+    .await;
     Ok(())
 }
 
