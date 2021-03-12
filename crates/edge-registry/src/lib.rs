@@ -1,9 +1,12 @@
-use bb8_postgres::bb8::Pool;
-use bb8_postgres::tokio_postgres::{Config, NoTls};
+use bb8_postgres::bb8::{Pool, PooledConnection};
+use bb8_postgres::tokio_postgres::{Config, Error, NoTls, Row};
 use bb8_postgres::{bb8, PostgresConnectionManager};
-use itertools::Itertools;
 use rpc::edge_registry::edge_registry_server::EdgeRegistry;
-use rpc::edge_registry::{Empty, NewEdgesMessage, Vertex, VertexList};
+use rpc::edge_registry::{
+    Edge, Empty, ObjectIdQuery, ObjectRelations, RelationDetails, RelationId, RelationIdQuery,
+    RelationList, RelationQuery, SchemaId, SchemaRelation,
+};
+use std::str::FromStr;
 use std::time;
 use structopt::StructOpt;
 use tonic::{Request, Response, Status};
@@ -17,7 +20,7 @@ pub struct RegistryConfig {
     password: String,
     #[structopt(long, env)]
     host: String,
-    #[structopt(long, env, default = "5432")]
+    #[structopt(long, env, default_value = "5432")]
     port: u16,
     #[structopt(long, env)]
     dbname: String,
@@ -31,7 +34,7 @@ pub struct EdgeRegistryImpl {
 }
 
 impl EdgeRegistryImpl {
-    pub async fn new(config: RegistryConfig) -> Self {
+    pub async fn new(config: RegistryConfig) -> Result<Self, Error> {
         let mut pg_config = Config::new();
         pg_config
             .user(&config.username)
@@ -44,75 +47,246 @@ impl EdgeRegistryImpl {
             .max_size(20)
             .connection_timeout(time::Duration::from_secs(30))
             .build(manager)
-            .await
-            .unwrap();
-        Self {
+            .await?;
+        Ok(Self {
             pool,
             schema: config.schema,
-        }
+        })
+    }
+
+    async fn set_schema(
+        &self,
+        conn: &PooledConnection<'_, PostgresConnectionManager<NoTls>>,
+    ) -> Result<(), Status> {
+        conn.execute(
+            format!("SET search_path TO '{}'", &self.schema).as_str(),
+            &[],
+        )
+        .await
+        .map_err(|err| Status::internal(err.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn connect(&self) -> Result<PooledConnection<'_, PostgresConnectionManager<NoTls>>, Status> {
+        let conn = self
+            .pool
+            .get()
+            .await
+            .map_err(|err| Status::internal(err.to_string()))?;
+
+        self.set_schema(&conn).await?;
+
+        Ok(conn)
+    }
+
+    fn extract_first_row(row: &[Row]) -> Result<&Row, Status> {
+        row.get(0)
+            .ok_or_else(|| Status::internal("No rows retrieved"))
     }
 }
 
 #[tonic::async_trait]
 impl EdgeRegistry for EdgeRegistryImpl {
+    async fn add_relation(
+        &self,
+        request: Request<SchemaRelation>,
+    ) -> Result<Response<RelationId>, Status> {
+        let request = request.into_inner();
+        let conn = self.connect().await?;
+
+        let parent_schema_id = parse_as_uuid(&request.parent_schema_id)?;
+        let child_schema_id = parse_as_uuid(&request.child_schema_id)?;
+
+        let row = conn
+            .query(
+                "INSERT INTO relations (parent_schema_id, child_schema_id) VALUES ($1::uuid, $2::uuid) RETURNING id",
+                 &[&parent_schema_id, &child_schema_id]
+            )
+            .await
+            .map_err(|err| Status::internal(err.to_string()))?;
+
+        let relation_id: Uuid = Self::extract_first_row(&row)?.get(0);
+
+        Ok(Response::new(RelationId {
+            relation_id: relation_id.to_string(),
+        }))
+    }
+
+    async fn get_relation(
+        &self,
+        request: Request<RelationQuery>,
+    ) -> Result<Response<RelationDetails>, Status> {
+        let request = request.into_inner();
+        let conn = self.connect().await?;
+
+        let relation_id = parse_as_uuid(&request.relation_id)?;
+        let parent_schema_id = parse_as_uuid(&request.parent_schema_id)?;
+
+        let row = conn
+            .query(
+                "SELECT child_schema_id FROM relations WHERE id = $1 AND parent_schema_id = $2",
+                &[&relation_id, &parent_schema_id],
+            )
+            .await
+            .map_err(|err| Status::internal(err.to_string()))?;
+
+        let row = Self::extract_first_row(&row)?;
+        let child_schema_id: Uuid = row.get(0);
+
+        Ok(Response::new(RelationDetails {
+            relation_id: request.relation_id.clone(),
+            parent_schema_id: request.parent_schema_id.clone(),
+            child_schema_id: child_schema_id.to_string(),
+        }))
+    }
+
+    async fn get_schema_relations(
+        &self,
+        request: Request<SchemaId>,
+    ) -> Result<Response<RelationList>, Status> {
+        let request = request.into_inner();
+        let conn = self.connect().await?;
+
+        let schema_id = parse_as_uuid(&request.schema_id)?;
+
+        let rows = conn
+            .query(
+                "SELECT id, child_schema_id FROM relations WHERE parent_schema_id = ($1::uuid)",
+                &[&schema_id],
+            )
+            .await
+            .map_err(|err| Status::internal(err.to_string()))?;
+
+        Ok(Response::new(RelationList {
+            items: rows
+                .into_iter()
+                .map(|row| {
+                    let relation_id: Uuid = row.get(0);
+                    let child_schema_id: Uuid = row.get(1);
+                    RelationDetails {
+                        relation_id: relation_id.to_string(),
+                        parent_schema_id: request.schema_id.clone(),
+                        child_schema_id: child_schema_id.to_string(),
+                    }
+                })
+                .collect(),
+        }))
+    }
+
+    // TODO: pagination
+    async fn list_relations(&self, _: Request<Empty>) -> Result<Response<RelationList>, Status> {
+        let conn = self.connect().await?;
+
+        let rows = conn
+            .query(
+                "SELECT id, parent_schema_id, child_schema_id FROM relations",
+                &[],
+            )
+            .await
+            .map_err(|err| Status::internal(err.to_string()))?;
+
+        Ok(Response::new(RelationList {
+            items: rows
+                .into_iter()
+                .map(|row| {
+                    let relation_id: Uuid = row.get(0);
+                    let parent_schema_id: Uuid = row.get(1);
+                    let child_schema_id: Uuid = row.get(2);
+                    RelationDetails {
+                        relation_id: relation_id.to_string(),
+                        parent_schema_id: parent_schema_id.to_string(),
+                        child_schema_id: child_schema_id.to_string(),
+                    }
+                })
+                .collect(),
+        }))
+    }
+
     async fn add_edges(
         &self,
-        request: Request<NewEdgesMessage>,
+        request: Request<ObjectRelations>,
     ) -> Result<Response<Empty>, Status> {
         let request = request.into_inner();
-        let conn = self.pool.get().await.unwrap();
+        let conn = self.connect().await?;
 
-        conn.execute(
-            format!("SET search_path TO '{}'", &self.schema).as_str(),
-            &[],
-        )
-        .await
-        .unwrap();
-        for relative in request.relatives {
-            conn.query(
-                "INSERT INTO edge (left_object_id, left_schema_id, right_object_id, right_schema_id) VALUES ($1, $2, $3, $4)",
-                &[&Uuid::parse_str(&request.object_id).unwrap(), &Uuid::parse_str(&request.schema_id).unwrap(), &Uuid::parse_str(&relative.object_id).unwrap(), &Uuid::parse_str(&relative.schema_id).unwrap()]
-            ).await.unwrap();
+        for relation in request.relations {
+            let relation_id = parse_as_uuid(&relation.relation_id)?;
+            let parent_object_id = parse_as_uuid(&relation.parent_object_id)?;
+            let child_object_id = parse_as_uuid(&relation.child_object_id)?;
+
+            conn
+                .query(
+                    "INSERT INTO edges (relation_id, parent_object_id, child_object_id) VALUES ($1, $2, $3)",
+                    &[&relation_id, &parent_object_id, &child_object_id],
+                )
+                .await
+                .map_err(|err| Status::internal(err.to_string()))?;
         }
 
         Ok(Response::new(Empty {}))
     }
 
-    async fn get_related_vertices(
-        &self,
-        request: Request<Vertex>,
-    ) -> Result<Response<VertexList>, Status> {
+    async fn get_edge(&self, request: Request<RelationIdQuery>) -> Result<Response<Edge>, Status> {
         let request = request.into_inner();
-        let conn = self.pool.get().await.unwrap();
+        let conn = self.connect().await?;
 
-        conn.execute(
-            format!("SET search_path TO '{}'", &self.schema).as_str(),
-            &[],
-        )
-        .await
-        .unwrap();
-        let mut rows = conn.query(
-            "SELECT left_object_id, left_schema_id FROM edge WHERE right_object_id = $1 AND right_schema_id = $2",
-            &[&Uuid::parse_str(&request.object_id).unwrap(), &Uuid::parse_str(&request.schema_id).unwrap()]
-        ).await.unwrap();
-        rows.extend(conn.query(
-            "SELECT right_object_id, right_schema_id FROM edge WHERE left_object_id = $1 AND left_schema_id = $2",
-                    &[&Uuid::parse_str(&request.object_id).unwrap(), &Uuid::parse_str(&request.schema_id).unwrap()]
-        ).await.unwrap());
+        let relation_id = parse_as_uuid(&request.relation_id)?;
+        let parent_object_id = parse_as_uuid(&request.parent_object_id)?;
 
-        Ok(Response::new(VertexList {
-            items: rows
+        let row = conn
+            .query(
+                "SELECT child_object_id FROM edges WHERE relation_id = $1 AND parent_object_id = $2",
+                &[&relation_id, &parent_object_id],
+            )
+            .await
+            .map_err(|err| Status::internal(err.to_string()))?;
+
+        let child_object_id: Uuid = Self::extract_first_row(&row)?.get(0);
+
+        Ok(Response::new(Edge {
+            relation_id: request.relation_id.to_string(),
+            parent_object_id: request.parent_object_id.to_string(),
+            child_object_id: child_object_id.to_string(),
+        }))
+    }
+
+    async fn get_edges(
+        &self,
+        request: Request<ObjectIdQuery>,
+    ) -> Result<Response<ObjectRelations>, Status> {
+        let request = request.into_inner();
+        let conn = self.connect().await?;
+
+        let object_id = parse_as_uuid(&request.object_id)?;
+        
+        let rows = conn
+            .query(
+                "SELECT relation_id, child_object_id FROM edges WHERE parent_object_id = $1",
+                &[&object_id],
+            )
+            .await
+            .map_err(|err| Status::internal(err.to_string()))?;
+
+        Ok(Response::new(ObjectRelations {
+            relations: rows
                 .into_iter()
                 .map(|row| {
-                    let object_id: Uuid = row.get(0);
-                    let schema_id: Uuid = row.get(1);
-                    Vertex {
-                        object_id: object_id.to_string(),
-                        schema_id: schema_id.to_string(),
+                    let relation_id: Uuid = row.get(0);
+                    let child_object_id: Uuid = row.get(1);
+
+                    Edge {
+                        relation_id: relation_id.to_string(),
+                        parent_object_id: request.object_id.to_string(),
+                        child_object_id: child_object_id.to_string(),
                     }
                 })
-                .unique()
                 .collect(),
         }))
     }
+}
+
+fn parse_as_uuid(s: &str) -> Result<Uuid, Status> {
+    Uuid::from_str(s)
+        .map_err(|err| Status::invalid_argument(err.to_string()))
 }
