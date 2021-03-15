@@ -31,13 +31,13 @@ spec:
             - name: POSTGRES_HOST
               value: {{ .Values.edgeRegistry.postgresHost }}
             - name: POSTGRES_PORT
-              value: {{ .Values.edgeRegistry.postgresPort }}
+              value: "{{ .Values.edgeRegistry.postgresPort }}"
             - name: POSTGRES_DBNAME
               value: {{ .Values.edgeRegistry.postgresDbname }}
             - name: POSTGRES_SCHEMA
               value: {{ .Values.edgeRegistry.postgresSchema }}
             - name: COMMUNICATION_PORT
-              value: {{ .Values.edgeRegistry.communicationPort }}
+              value: "{{ .Values.edgeRegistry.communicationPort }}"
             - name: RUST_LOG
               value: "info,data_router=debug"
           ports:
