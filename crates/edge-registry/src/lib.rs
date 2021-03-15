@@ -15,17 +15,17 @@ use uuid::Uuid;
 #[derive(Clone, Debug, StructOpt)]
 pub struct RegistryConfig {
     #[structopt(long, env)]
-    username: String,
+    postgres_username: String,
     #[structopt(long, env)]
-    password: String,
+    postgres_password: String,
     #[structopt(long, env)]
-    host: String,
+    postgres_host: String,
     #[structopt(long, env, default_value = "5432")]
-    port: u16,
+    postgres_port: u16,
     #[structopt(long, env)]
-    dbname: String,
+    postgres_dbname: String,
     #[structopt(long, env)]
-    schema: String,
+    postgres_schema: String,
     #[structopt(long, env, default_value = "50110")]
     pub communication_port: u16,
 }
@@ -39,11 +39,11 @@ impl EdgeRegistryImpl {
     pub async fn new(config: &RegistryConfig) -> Result<Self, Error> {
         let mut pg_config = Config::new();
         pg_config
-            .user(&config.username)
-            .password(&config.password)
-            .host(&config.host)
-            .port(config.port)
-            .dbname(&config.dbname);
+            .user(&config.postgres_username)
+            .password(&config.postgres_password)
+            .host(&config.postgres_host)
+            .port(config.postgres_port)
+            .dbname(&config.postgres_dbname);
         let manager = PostgresConnectionManager::new(pg_config, NoTls);
         let pool = bb8::Pool::builder()
             .max_size(20)
@@ -52,7 +52,7 @@ impl EdgeRegistryImpl {
             .await?;
         Ok(Self {
             pool,
-            schema: config.schema.clone(),
+            schema: config.postgres_schema.clone(),
         })
     }
 
