@@ -20,11 +20,11 @@ services:
     environment:
       DB_NAME: "/var/data/schema"
       REPLICATION_ROLE: "master"
-      REPLICATION_QUEUE: "kafka"
+      COMMUNICATION_METHOD: "kafka"
       KAFKA_BROKERS: "kafka:9093"
       KAFKA_GROUP_ID: "schema_registry"
-      REPLICATION_TOPIC_OR_QUEUE: "cdl.schema_registry.internal"
-      REPLICATION_TOPIC_OR_EXCHANGE: "cdl.schema_registry.internal"
+      REPLICATION_SOURCE: "cdl.schema_registry.internal"
+      REPLICATION_DESTINATION: "cdl.schema_registry.internal"
       INPUT_PORT: "50101"
       IMPORT_FILE: "/var/data/schema.json"
       RUST_LOG: info,schema_registry=trace
@@ -41,11 +41,10 @@ services:
         - ENV=DEV
     command: /bin/data-router
     environment:
-      MESSAGE_QUEUE: "kafka"
+      COMMUNICATION_METHOD: "kafka"
       KAFKA_BROKERS: "kafka:9093"
       KAFKA_GROUP_ID: "data_router"
-      INPUT_TOPIC_OR_QUEUE: "cdl.data.input"
-      ERROR_TOPIC_OR_EXCHANGE: "cdl.reports"
+      INPUT_SOURCE: "cdl.data.input"
       SCHEMA_REGISTRY_ADDR: "http://schema_registry:50101"
       CACHE_CAPACITY: "1000"
       RUST_LOG: info,data_router=trace
@@ -92,7 +91,7 @@ services:
     image: cdl-api:latest
     command: "/bin/api"
     ports:
-      - "50106:50106"
+      - "50104:50104"
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -103,11 +102,11 @@ services:
       RUST_LOG: info,api=trace
       SCHEMA_REGISTRY_ADDR: "http://schema_registry:50101"
       QUERY_ROUTER_ADDR: "http://query_router:50103"
-      MESSAGE_QUEUE: "kafka"
+      COMMUNICATION_METHOD: "kafka"
       KAFKA_BROKERS: "kafka:9093"
       KAFKA_GROUP_ID: "cdl-api"
-      REPORT_TOPIC_OR_QUEUE: "cdl.reports"
-      DATA_ROUTER_TOPIC_OR_QUEUE: "cdl.reports"
+      REPORT_SOURCE: "cdl.reports"
+      INSERT_DESTINATION: "cdl.reports"
 
 networks:
   compose_default:

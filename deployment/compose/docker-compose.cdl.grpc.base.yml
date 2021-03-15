@@ -20,11 +20,9 @@ services:
     environment:
       DB_NAME: "/var/data/schema"
       REPLICATION_ROLE: "master"
-      COMMUNICATION_METHOD: "amqp"
-      AMQP_CONNECTION_STRING: "amqp://user:CHANGEME@rabbitmq:5672/%2f"
-      AMQP_CONSUMER_TAG: "schema_registry"
-      REPLICATION_SOURCE: "cdl.schema_registry.internal"
-      REPLICATION_DESTINATION: "cdl.schema_registry.internal"
+      COMMUNICATION_METHOD: "grpc"
+      REPLICATION_SOURCE: "none"
+      REPLICATION_DESTINATION: "none"
       INPUT_PORT: "50101"
       IMPORT_FILE: "/var/data/schema.json"
       RUST_LOG: info,schema_registry=trace
@@ -40,11 +38,11 @@ services:
         - BIN=data-router
         - ENV=DEV
     command: /bin/data-router
+    ports:
+      - "50102:50102"
     environment:
-      COMMUNICATION_METHOD: "amqp"
-      AMQP_CONNECTION_STRING: "amqp://user:CHANGEME@rabbitmq:5672/%2f"
-      AMQP_CONSUMER_TAG: "data_router"
-      INPUT_SOURCE: "cdl.data.input"
+      COMMUNICATION_METHOD: "grpc"
+      GRPC_PORT: "50102"
       SCHEMA_REGISTRY_ADDR: "http://schema_registry:50101"
       CACHE_CAPACITY: "1000"
       RUST_LOG: info,data_router=trace
@@ -66,27 +64,6 @@ services:
       SCHEMA_REGISTRY_ADDR: "http://schema_registry:50101"
       RUST_LOG: info,query_router=trace
 
-  edge_registry:
-    image: cdl-edge-registry:latest
-    build:
-      context: ../..
-      dockerfile: Dockerfile
-      args:
-        - BIN=edge-registry
-        - ENV=DEV
-    command: "/bin/edge-registry"
-    ports:
-      - "50110:50110"
-    environment:
-      POSTGRES_USERNAME: postgres
-      POSTGRES_PASSWORD: 1234
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_DBNAME: postgres
-      POSTGRES_SCHEMA: cdl
-      COMMUNICATION_PORT: 50110
-      RUST_LOG: info,edge_registry=trace
-
   web_api:
     image: cdl-api:latest
     command: "/bin/api"
@@ -102,11 +79,8 @@ services:
       RUST_LOG: info,api=trace
       SCHEMA_REGISTRY_ADDR: "http://schema_registry:50101"
       QUERY_ROUTER_ADDR: "http://query_router:50103"
-      COMMUNICATION_METHOD: "amqp"
-      AMQP_CONNECTION_STRING: "amqp://user:CHANGEME@rabbitmq:5672/%2f"
-      AMQP_CONSUMER_TAG: "cdl-api"
-      REPORT_SOURCE: "cdl.reports"
-      INSERT_DESTINATION: "cdl.reports"
+      COMMUNICATION_METHOD: "grpc"
+      INSERT_DESTINATION: "http://data_router:50102"
 
 networks:
   compose_default:

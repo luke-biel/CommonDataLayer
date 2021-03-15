@@ -3,6 +3,7 @@ use crate::{
     types::storage::vertices::View,
     types::ViewUpdate,
     types::{NewSchema, NewSchemaVersion},
+    AmqpConfig, KafkaConfig,
 };
 use log::info;
 use rpc::schema_registry::types::SchemaType;
@@ -11,6 +12,7 @@ use std::{
     sync::{mpsc, Arc},
     thread,
 };
+use structopt::clap::arg_enum;
 use tokio::{runtime::Handle, sync::oneshot};
 use uuid::Uuid;
 
@@ -45,23 +47,28 @@ pub enum ReplicationEvent {
     },
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum ReplicationRole {
-    Master,
-    Slave,
-    None,
+arg_enum! {
+    #[derive(Clone, Debug, Deserialize, PartialEq)]
+    #[serde(rename_all = "snake_case")]
+    pub enum ReplicationRole {
+        Master,
+        Slave,
+        None,
+    }
 }
 
 pub struct ReplicationState {
     replication_role: ReplicationRole,
     stop_channel: Option<oneshot::Sender<()>>,
     master_replication_channel: Option<mpsc::Sender<ReplicationEvent>>,
-    message_queue_config: MessageQueueConfig,
+    message_queue_config: ReplicationMethodConfig,
     db: Arc<SchemaDb>,
 }
 impl ReplicationState {
-    pub fn new(message_queue_config: MessageQueueConfig, db: Arc<SchemaDb>) -> ReplicationState {
+    pub fn new(
+        message_queue_config: ReplicationMethodConfig,
+        db: Arc<SchemaDb>,
+    ) -> ReplicationState {
         ReplicationState {
             replication_role: ReplicationRole::None,
             stop_channel: None,
@@ -122,33 +129,21 @@ impl ReplicationState {
 }
 
 #[derive(Clone, Debug)]
-pub struct MessageQueueConfig {
-    pub queue: MessageQueue,
-    pub topic_or_queue: String,
-    pub topic_or_exchange: String,
+pub struct ReplicationMethodConfig {
+    pub queue: CommunicationMethod,
+    pub source: String,
+    pub destination: String,
 }
 
 #[derive(Clone, Debug)]
-pub enum MessageQueue {
+pub enum CommunicationMethod {
     Kafka(KafkaConfig),
     Amqp(AmqpConfig),
 }
 
-#[derive(Clone, Debug)]
-pub struct KafkaConfig {
-    pub brokers: String,
-    pub group_id: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct AmqpConfig {
-    pub connection_string: String,
-    pub consumer_tag: String,
-}
-
 fn start_replication_slave(
     db: Arc<SchemaDb>,
-    config: &MessageQueueConfig,
+    config: &ReplicationMethodConfig,
     kill_signal: oneshot::Receiver<()>,
 ) {
     tokio::spawn(slave::consume_mq(config.clone(), db, kill_signal));
