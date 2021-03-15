@@ -1,6 +1,5 @@
 use anyhow::Context;
 use async_trait::async_trait;
-use log::{debug, error, trace};
 use lru_cache::LruCache;
 use rpc::schema_registry::Id;
 use serde::{Deserialize, Serialize};
@@ -11,6 +10,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use structopt::{clap::arg_enum, StructOpt};
+use tracing::{debug, error, trace};
 use utils::{
     abort_on_poison,
     communication::{
@@ -77,7 +77,7 @@ struct Config {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    env_logger::init();
+    utils::tracing::init();
     let config: Config = Config::from_args();
 
     debug!("Environment {:?}", config);

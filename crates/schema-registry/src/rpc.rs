@@ -97,6 +97,7 @@ impl SchemaRegistryImpl {
 
 #[tonic::async_trait]
 impl SchemaRegistry for SchemaRegistryImpl {
+    #[tracing::instrument(skip(self))]
     async fn add_schema(
         &self,
         request: Request<rpc::schema_registry::NewSchema>,
@@ -133,6 +134,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn add_schema_version(
         &self,
         request: Request<rpc::schema_registry::NewSchemaVersion>,
@@ -154,6 +156,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         Ok(Response::new(Empty {}))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn update_schema_metadata(
         &self,
         request: Request<SchemaMetadataUpdate>,
@@ -203,6 +206,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         Ok(Response::new(Empty {}))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn add_view_to_schema(
         &self,
         request: Request<NewSchemaView>,
@@ -229,6 +233,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn update_view(
         &self,
         request: Request<UpdatedView>,
@@ -249,6 +254,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_schema(
         &self,
         request: Request<VersionedId>,
@@ -266,6 +272,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_schema_metadata(&self, request: Request<Id>) -> Result<Response<Schema>, Status> {
         let request = request.into_inner();
         let schema_id = parse_uuid(&request.id)?;
@@ -281,6 +288,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         Ok(Response::new(schema))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_schema_topic(
         &self,
         request: Request<Id>,
@@ -292,6 +300,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         Ok(Response::new(SchemaTopic { topic }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_schema_query_address(
         &self,
         request: Request<Id>,
@@ -303,6 +312,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         Ok(Response::new(SchemaQueryAddress { address }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_schema_versions(
         &self,
         request: Request<Id>,
@@ -317,6 +327,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         Ok(Response::new(SchemaVersions { versions }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_schema_type(
         &self,
         request: Request<Id>,
@@ -330,6 +341,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_view(
         &self,
         request: Request<Id>,
@@ -343,7 +355,9 @@ impl SchemaRegistry for SchemaRegistryImpl {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_all_schemas(&self, _request: Request<Empty>) -> Result<Response<Schemas>, Status> {
+        tracing::debug!("HERE");
         let schemas = self.db.get_all_schemas()?;
 
         Ok(Response::new(Schemas {
@@ -364,6 +378,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_all_schema_names(
         &self,
         _request: Request<Empty>,
@@ -378,6 +393,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_all_views_of_schema(
         &self,
         request: Request<Id>,
@@ -401,6 +417,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn validate_value(
         &self,
         request: Request<ValueToValidate>,
@@ -422,6 +439,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         Ok(Response::new(Errors { errors }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn promote_to_master(
         &self,
         _request: Request<Empty>,
@@ -438,6 +456,7 @@ impl SchemaRegistry for SchemaRegistryImpl {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn heartbeat(&self, _request: Request<Empty>) -> Result<Response<Empty>, Status> {
         //empty
         Ok(Response::new(Empty {}))

@@ -5,9 +5,9 @@ use kube::{
     api::{DeleteParams, ListParams, Meta, PatchParams},
     Api, Client,
 };
-use log::{debug, info, warn};
 use serde::Deserialize;
 use std::{fs, time::Duration};
+use tracing::{debug, info, warn};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -19,7 +19,8 @@ pub struct Config {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    env_logger::init();
+    utils::tracing::init();
+
     let config = envy::from_env::<Config>().context("Env vars not set correctly")?;
     debug!("Environment {:?}", config);
 

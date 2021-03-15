@@ -1,6 +1,6 @@
 #![feature(linked_list_cursors)]
 
-use log::error;
+use ::tracing::error;
 use std::{
     process,
     sync::PoisonError,
@@ -15,6 +15,11 @@ pub mod psql;
 pub mod query_utils;
 pub mod status_endpoints;
 pub mod task_limiter;
+pub mod tracing {
+    pub fn init() {
+        tracing_subscriber::fmt::init();
+    }
+}
 
 pub fn abort_on_poison<T>(_e: PoisonError<T>) -> T {
     error!("Encountered mutex poisoning. Aborting.");

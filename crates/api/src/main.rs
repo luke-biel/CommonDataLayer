@@ -17,7 +17,7 @@ const SEC_WEBSOCKET_PROTOCOL_VALUE: &str = "graphql-ws";
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
+    utils::tracing::init();
     let config = Arc::new(Config::from_args());
 
     let cors = warp::cors()
@@ -63,7 +63,7 @@ async fn main() {
                     )
                     .map(|r| {
                         if let Err(e) = r {
-                            log::error!("Websocket error: {}", e);
+                            tracing::error!("Websocket error: {}", e);
                         }
                     })
                     .await
