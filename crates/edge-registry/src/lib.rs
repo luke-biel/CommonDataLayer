@@ -26,6 +26,8 @@ pub struct RegistryConfig {
     dbname: String,
     #[structopt(long, env)]
     schema: String,
+    #[structopt(long, env, default_value = "50110")]
+    pub communication_port: u16,
 }
 
 pub struct EdgeRegistryImpl {
@@ -34,7 +36,7 @@ pub struct EdgeRegistryImpl {
 }
 
 impl EdgeRegistryImpl {
-    pub async fn new(config: RegistryConfig) -> Result<Self, Error> {
+    pub async fn new(config: &RegistryConfig) -> Result<Self, Error> {
         let mut pg_config = Config::new();
         pg_config
             .user(&config.username)
@@ -50,7 +52,7 @@ impl EdgeRegistryImpl {
             .await?;
         Ok(Self {
             pool,
-            schema: config.schema,
+            schema: config.schema.clone(),
         })
     }
 
