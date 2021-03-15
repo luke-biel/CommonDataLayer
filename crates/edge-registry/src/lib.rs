@@ -68,7 +68,9 @@ impl EdgeRegistryImpl {
         Ok(())
     }
 
-    async fn connect(&self) -> Result<PooledConnection<'_, PostgresConnectionManager<NoTls>>, Status> {
+    async fn connect(
+        &self,
+    ) -> Result<PooledConnection<'_, PostgresConnectionManager<NoTls>>, Status> {
         let conn = self
             .pool
             .get()
@@ -259,7 +261,7 @@ impl EdgeRegistry for EdgeRegistryImpl {
         let conn = self.connect().await?;
 
         let object_id = parse_as_uuid(&request.object_id)?;
-        
+
         let rows = conn
             .query(
                 "SELECT relation_id, child_object_id FROM edges WHERE parent_object_id = $1",
@@ -287,6 +289,5 @@ impl EdgeRegistry for EdgeRegistryImpl {
 }
 
 fn parse_as_uuid(s: &str) -> Result<Uuid, Status> {
-    Uuid::from_str(s)
-        .map_err(|err| Status::invalid_argument(err.to_string()))
+    Uuid::from_str(s).map_err(|err| Status::invalid_argument(err.to_string()))
 }
