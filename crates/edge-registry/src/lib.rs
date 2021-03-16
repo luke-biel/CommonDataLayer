@@ -3,7 +3,7 @@ use bb8_postgres::tokio_postgres::{Config, Error, NoTls, Row};
 use bb8_postgres::{bb8, PostgresConnectionManager};
 use rpc::edge_registry::edge_registry_server::EdgeRegistry;
 use rpc::edge_registry::{
-    Edge, Empty, ObjectIdQuery, ObjectRelations, RelationDetails, RelationId, RelationIdQuery,
+    Edge, Empty, JsonObject, ObjectIdQuery, ObjectRelations, RelationDetails, RelationId, RelationIdQuery,
     RelationList, RelationQuery, SchemaId, SchemaRelation,
 };
 use std::str::FromStr;
@@ -11,6 +11,9 @@ use std::time;
 use structopt::StructOpt;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
+use serde::Deserialize;
+
+type TonicResult<T> = Result<Response<T>, Status>;
 
 #[derive(Clone, Debug, StructOpt)]
 pub struct RegistryConfig {
@@ -33,6 +36,30 @@ pub struct RegistryConfig {
 pub struct EdgeRegistryImpl {
     pool: Pool<PostgresConnectionManager<NoTls>>,
     schema: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct ObjectTreeQuery {
+    object_ids: Vec<Uuid>,
+    relations: Vec<Relations>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct Relations {
+    relation_id: Uuid,
+    relations: Vec<Relations>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct Object {
+    object_id: Uuid,
+    relations: Vec<Relation>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct Relation {
+    relation_id: Uuid,
+    objects: Vec<Object>,
 }
 
 impl EdgeRegistryImpl {
@@ -95,7 +122,7 @@ impl EdgeRegistry for EdgeRegistryImpl {
     async fn add_relation(
         &self,
         request: Request<SchemaRelation>,
-    ) -> Result<Response<RelationId>, Status> {
+    ) -> TonicResult<RelationId> {
         let request = request.into_inner();
         let conn = self.connect().await?;
 
@@ -120,7 +147,7 @@ impl EdgeRegistry for EdgeRegistryImpl {
     async fn get_relation(
         &self,
         request: Request<RelationQuery>,
-    ) -> Result<Response<RelationDetails>, Status> {
+    ) -> TonicResult<RelationDetails> {
         let request = request.into_inner();
         let conn = self.connect().await?;
 
@@ -148,7 +175,7 @@ impl EdgeRegistry for EdgeRegistryImpl {
     async fn get_schema_relations(
         &self,
         request: Request<SchemaId>,
-    ) -> Result<Response<RelationList>, Status> {
+    ) -> TonicResult<RelationList> {
         let request = request.into_inner();
         let conn = self.connect().await?;
 
@@ -179,7 +206,7 @@ impl EdgeRegistry for EdgeRegistryImpl {
     }
 
     // TODO: pagination
-    async fn list_relations(&self, _: Request<Empty>) -> Result<Response<RelationList>, Status> {
+    async fn list_relations(&self, _: Request<Empty>) -> TonicResult<RelationList> {
         let conn = self.connect().await?;
 
         let rows = conn
@@ -210,7 +237,7 @@ impl EdgeRegistry for EdgeRegistryImpl {
     async fn add_edges(
         &self,
         request: Request<ObjectRelations>,
-    ) -> Result<Response<Empty>, Status> {
+    ) -> TonicResult<Empty> {
         let request = request.into_inner();
         let conn = self.connect().await?;
 
@@ -231,34 +258,23 @@ impl EdgeRegistry for EdgeRegistryImpl {
         Ok(Response::new(Empty {}))
     }
 
-    async fn get_edge(&self, request: Request<RelationIdQuery>) -> Result<Response<Edge>, Status> {
+    async fn get_edge(&self, request: Request<RelationIdQuery>) -> TonicResult<Edge> {
         let request = request.into_inner();
         let conn = self.connect().await?;
 
-        let relation_id = parse_as_uuid(&request.relation_id)?;
-        let parent_object_id = parse_as_uuid(&request.parent_object_id)?;
-
-        let row = conn
-            .query(
-                "SELECT child_object_id FROM edges WHERE relation_id = $1 AND parent_object_id = $2",
-                &[&relation_id, &parent_object_id],
-            )
-            .await
-            .map_err(|err| Status::internal(err.to_string()))?;
-
-        let child_object_id: Uuid = Self::extract_first_row(&row)?.get(0);
+        let child_object_ids = query_edge(parse_as_uuid(request.relation_id)?, parse_as_uuid(request.parent_object_id)?, &conn).await?.map(String::to_string);
 
         Ok(Response::new(Edge {
             relation_id: request.relation_id.to_string(),
             parent_object_id: request.parent_object_id.to_string(),
-            child_object_id: child_object_id.to_string(),
+            child_object_ids,
         }))
     }
 
     async fn get_edges(
         &self,
         request: Request<ObjectIdQuery>,
-    ) -> Result<Response<ObjectRelations>, Status> {
+    ) -> TonicResult<ObjectRelations> {
         let request = request.into_inner();
         let conn = self.connect().await?;
 
@@ -288,8 +304,45 @@ impl EdgeRegistry for EdgeRegistryImpl {
                 .collect(),
         }))
     }
+
+    async fn resolve_tree(&self, request: Request<JsonObject>) -> TonicResult<JsonObject> {
+        let request = request.into_inner();
+        let json: ObjectTreeQuery = serde_json::from_slice(&request.object).unwrap();
+
+        let conn = self.connect().await?;
+
+        resolve_relation(json.relations, json.object_ids);
+
+        unimplemented!();
+    }
 }
+
+async fn resolve_relation(relations: impl IntoIterator<Item = Relations>, object_ids: impl IntoIterator<Item = Uuid>, conn: &PooledConnection<PostgresConnectionManager<NoTls>>) -> Result<impl IntoIterator<Item = Object>, Status> {
+    object_ids.map(|object_id| {
+        for relation in relations {
+            let children = query_edge(relation.relation_id, object_id, &conn).await?;
+            let child_relations = resolve_relation(relation.relations, children, &conn).await?;
+        }
+    });
+
+    Ok(())
+}
+
 
 fn parse_as_uuid(s: &str) -> Result<Uuid, Status> {
     Uuid::from_str(s).map_err(|err| Status::invalid_argument(err.to_string()))
+}
+
+async fn query_edge(relation_id: Uuid, parent_object_id: Uuid, conn: &PooledConnection<PostgresConnectionManager<NoTls>>) -> Result<impl Iterator<Item = Uuid>, Status> {
+    Ok(
+        conn
+            .query(
+                "SELECT child_object_id FROM edges WHERE relation_id = $1 AND parent_object_id = $2",
+                &[&relation_id, &parent_object_id],
+            )
+            .await
+            .map_err(|err| Status::internal(err.to_string()))?
+            .into_iter()
+            .map(|row| row.get(0))
+    )
 }

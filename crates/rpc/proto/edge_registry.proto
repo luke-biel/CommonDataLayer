@@ -11,8 +11,9 @@ service EdgeRegistry {
   rpc GetEdge(RelationIdQuery) returns (Edge);
   rpc GetEdges(ObjectIdQuery) returns (ObjectRelations);
 
+  rpc ResolveTree(JsonObject) returns (JsonObject);
+
   // TODO: Deleting relations and edges
-  // TODO: Resolving multiple relations on object at once
 }
 
 message SchemaRelation {
@@ -50,7 +51,7 @@ message ObjectRelations {
 message Edge {
   required string relation_id = 1;
   required string parent_object_id = 2;
-  required string child_object_id = 3;
+  repeated string child_object_id = 3;
 }
 
 message RelationIdQuery {
@@ -60,6 +61,10 @@ message RelationIdQuery {
 
 message ObjectIdQuery {
   required string object_id = 1;
+}
+
+message JsonObject {
+  required bytes object = 1;
 }
 
 message Empty {}
