@@ -854,12 +854,19 @@ checksum = "134951f4028bdadb9b84baf4232681efbf277da25144b9b0ad65df75946c422b"
 name = "edge-registry"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "bb8-postgres",
+ "env_logger 0.8.3",
  "itertools 0.10.0",
+ "log",
  "rpc",
+ "serde",
+ "serde_json",
  "structopt",
  "tokio 0.2.24",
  "tonic",
+ "utils",
  "uuid",
 ]
 

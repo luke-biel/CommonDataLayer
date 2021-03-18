@@ -3,7 +3,7 @@ package edge_registry;
 
 service EdgeRegistry {
   rpc AddRelation(SchemaRelation) returns (RelationId);
-  rpc GetRelation(RelationQuery) returns (RelationDetails);
+  rpc GetRelation(RelationQuery) returns (RelationResponse);
   rpc GetSchemaRelations(SchemaId) returns (RelationList);
   rpc ListRelations(Empty) returns (RelationList);
 
@@ -29,6 +29,10 @@ message RelationQuery {
   required string parent_schema_id = 2;
 }
 
+message RelationResponse {
+  repeated string child_schema_ids = 1;
+}
+
 message SchemaId {
   required string schema_id = 1;
 }
@@ -50,7 +54,7 @@ message ObjectRelations {
 message Edge {
   required string relation_id = 1;
   required string parent_object_id = 2;
-  required string child_object_id = 3;
+  repeated string child_object_ids = 3;
 }
 
 message RelationIdQuery {
