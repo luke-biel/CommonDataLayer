@@ -3,7 +3,18 @@ cargo-features = ["named-profiles"]
 [workspace]
 members = [
   "benchmarking",
-  "crates/*"
+  "crates/api",
+  "crates/cdl-cli",
+  "crates/command-service",
+  "crates/data-router",
+  "crates/db-shrinker-postgres",
+  "crates/leader-elector",
+  "crates/query-router",
+  "crates/query-service",
+  "crates/query-service-ts",
+  "crates/rpc",
+  "crates/schema-registry",
+  "crates/utils"
 ]
 
 [profile.ci]
