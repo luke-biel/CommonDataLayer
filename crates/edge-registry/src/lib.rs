@@ -17,8 +17,7 @@ use structopt::StructOpt;
 use tonic::{Request, Response, Status};
 use utils::communication::consumer::{CommonConsumerConfig, ConsumerHandler};
 use utils::communication::message::CommunicationMessage;
-use utils::metrics;
-use utils::metrics::counter;
+use utils::metrics::{self, counter};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, StructOpt)]
@@ -33,11 +32,13 @@ pub struct RegistryConfig {
     postgres_port: u16,
     #[structopt(long, env)]
     postgres_dbname: String,
-    #[structopt(long, env)]
+    #[structopt(long, env, default_value = "public")]
     postgres_schema: String,
     #[structopt(long, env, default_value = "50110")]
+    /// gRPC server port to host edge-registry on
     pub communication_port: u16,
     #[structopt(long, env, default_value = metrics::DEFAULT_PORT)]
+    /// Prometheus metrics port
     pub metrics_port: u16,
     #[structopt(flatten)]
     pub consumer_config: ConsumerConfig,
@@ -46,28 +47,34 @@ pub struct RegistryConfig {
 #[derive(Clone, Debug, StructOpt)]
 enum ConsumerMethod {
     Kafka,
-    AMQP,
+    Amqp,
 }
 
 #[derive(Clone, Debug, StructOpt)]
 pub struct ConsumerConfig {
     #[structopt(long, env)]
+    /// Method of ingestion of messages via Message Queue
     method: ConsumerMethod,
     #[structopt(long, env)]
+    /// Kafka broker or Amqp (eg. RabbitMQ) host
     mq_host: String,
     #[structopt(long, env)]
+    /// Kafka group id or Amqp consumer tag
     mq_tag: String,
     #[structopt(long, env)]
+    /// Kafka topic or Amqp queue
     mq_source: String,
+}
+
+#[derive(Deserialize)]
+pub struct AddEdgesMessage {
+    relation_id: Uuid,
+    parent_object_id: Uuid,
+    child_object_ids: Vec<Uuid>,
 }
 
 #[derive(Clone)]
 pub struct EdgeRegistryImpl {
-    db: DbWrapper,
-}
-
-#[derive(Clone)]
-pub struct DbWrapper {
     pool: Pool<PostgresConnectionManager<NoTls>>,
     schema: String,
 }
@@ -80,7 +87,7 @@ impl<'a> From<&'a ConsumerConfig> for CommonConsumerConfig<'a> {
                 group_id: &config.mq_tag,
                 topic: &config.mq_source,
             },
-            ConsumerMethod::AMQP => CommonConsumerConfig::Amqp {
+            ConsumerMethod::Amqp => CommonConsumerConfig::Amqp {
                 connection_string: &config.mq_host,
                 consumer_tag: &config.mq_tag,
                 queue_name: &config.mq_source,
@@ -96,13 +103,13 @@ impl FromStr for ConsumerMethod {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "kafka" => Ok(ConsumerMethod::Kafka),
-            "amqp" => Ok(ConsumerMethod::AMQP),
+            "amqp" => Ok(ConsumerMethod::Amqp),
             _ => Err("Invalid consumer method"),
         }
     }
 }
 
-impl DbWrapper {
+impl EdgeRegistryImpl {
     pub async fn new(config: &RegistryConfig) -> anyhow::Result<Self> {
         let mut pg_config = Config::new();
         pg_config
@@ -146,14 +153,6 @@ impl DbWrapper {
 
         Ok(conn)
     }
-}
-
-impl EdgeRegistryImpl {
-    pub async fn new(config: &RegistryConfig) -> anyhow::Result<Self> {
-        Ok(Self {
-            db: DbWrapper::new(config).await?,
-        })
-    }
 
     async fn add_relation_impl(
         &self,
@@ -162,7 +161,7 @@ impl EdgeRegistryImpl {
     ) -> anyhow::Result<Uuid> {
         counter!("cdl.edge-registry.add-relation", 1);
 
-        let conn = self.db.connect().await?;
+        let conn = self.connect().await?;
 
         let row = conn
             .query(
@@ -181,7 +180,7 @@ impl EdgeRegistryImpl {
     ) -> anyhow::Result<impl Iterator<Item = Uuid>> {
         counter!("cdl.edge-registry.get-relation", 1);
 
-        let conn = self.db.connect().await?;
+        let conn = self.connect().await?;
         Ok(conn
             .query(
                 "SELECT child_schema_id FROM relations WHERE id = $1 AND parent_schema_id = $2",
@@ -198,7 +197,7 @@ impl EdgeRegistryImpl {
     ) -> anyhow::Result<impl Iterator<Item = (Uuid, Uuid)>> {
         counter!("cdl.edge-registry.get-schema-relations", 1);
 
-        let conn = self.db.connect().await?;
+        let conn = self.connect().await?;
         Ok(conn
             .query(
                 "SELECT id, child_schema_id FROM relations WHERE parent_schema_id = ($1::uuid)",
@@ -213,7 +212,7 @@ impl EdgeRegistryImpl {
         &self,
     ) -> anyhow::Result<impl Iterator<Item = (Uuid, Uuid, Uuid)>> {
         counter!("cdl.edge-registry.list-relations", 1);
-        let conn = self.db.connect().await?;
+        let conn = self.connect().await?;
 
         Ok(conn
             .query(
@@ -230,7 +229,7 @@ impl EdgeRegistryImpl {
         relations: impl IntoIterator<Item = AddEdgesMessage>,
     ) -> anyhow::Result<()> {
         counter!("cdl.edge-registry.add-edges", 1);
-        let conn = self.db.connect().await?;
+        let conn = self.connect().await?;
 
         for relation in relations {
             for child_object_id in relation.child_object_ids {
@@ -252,7 +251,7 @@ impl EdgeRegistryImpl {
         parent_object_id: Uuid,
     ) -> anyhow::Result<impl Iterator<Item = Uuid>> {
         counter!("cdl.edge-registry.get-edge", 1);
-        let conn = self.db.connect().await?;
+        let conn = self.connect().await?;
 
         Ok(conn
             .query(
@@ -270,7 +269,7 @@ impl EdgeRegistryImpl {
         object_id: Uuid,
     ) -> anyhow::Result<impl Iterator<Item = (Uuid, Uuid)>> {
         counter!("cdl.edge-registry.get-edges", 1);
-        let conn = self.db.connect().await?;
+        let conn = self.connect().await?;
         Ok(conn
             .query(
                 "SELECT relation_id, child_object_id FROM edges WHERE parent_object_id = $1",
@@ -289,6 +288,8 @@ impl EdgeRegistry for EdgeRegistryImpl {
         request: Request<SchemaRelation>,
     ) -> Result<Response<RelationId>, Status> {
         let request = request.into_inner();
+
+        trace!("Received `add_relation` message with parent_id `{}` and child_id `{}`", request.parent_schema_id, request.child_schema_id);
 
         let parent_schema_id = Uuid::from_str(&request.parent_schema_id)
             .map_err(|_| Status::invalid_argument("parent_schema_id"))?;
@@ -311,6 +312,8 @@ impl EdgeRegistry for EdgeRegistryImpl {
     ) -> Result<Response<RelationResponse>, Status> {
         let request = request.into_inner();
 
+        trace!("Received `get_relation` message with relation_id `{}` and parent_id `{}`", request.relation_id, request.parent_schema_id);
+
         let relation_id = Uuid::from_str(&request.relation_id)
             .map_err(|_| Status::invalid_argument("relation_id"))?;
         let parent_schema_id = Uuid::from_str(&request.parent_schema_id)
@@ -332,6 +335,8 @@ impl EdgeRegistry for EdgeRegistryImpl {
     ) -> Result<Response<RelationList>, Status> {
         let request = request.into_inner();
 
+        trace!("Received `get_schema_relations` message with schema_id `{}`", request.schema_id);
+
         let schema_id = Uuid::from_str(&request.schema_id)
             .map_err(|_| Status::invalid_argument("schema_id"))?;
 
@@ -351,8 +356,9 @@ impl EdgeRegistry for EdgeRegistryImpl {
         }))
     }
 
-    // TODO: pagination
     async fn list_relations(&self, _: Request<Empty>) -> Result<Response<RelationList>, Status> {
+        trace!("Received `list_relations` message");
+
         let rows = self
             .list_relations_impl()
             .await
@@ -399,12 +405,16 @@ impl EdgeRegistry for EdgeRegistryImpl {
                 })
             })
             .collect::<anyhow::Result<Vec<AddEdgesMessage>>>()
-            .map_err(|err| Status::invalid_argument(err.to_string()))?; // TODO: Provide more context
+            .map_err(|err| {
+                debug!("Failed deserializing `add_edges` query. {:?}", err);
+                Status::invalid_argument("Failed to deserialize query. Check if all uuids are in correct format.")
+            })?;
 
         counter!(
             "cdl.edge-registry.add-edges.count",
             edges.len().try_into().unwrap()
         );
+        trace!("Received `add_edges` message with {} edges to add", edges.len());
 
         self.add_edges_impl(edges)
             .await
@@ -415,6 +425,8 @@ impl EdgeRegistry for EdgeRegistryImpl {
 
     async fn get_edge(&self, request: Request<RelationIdQuery>) -> Result<Response<Edge>, Status> {
         let request = request.into_inner();
+
+        trace!("Received `get_edge` message with relation_id `{}` and parent_id `{}`", request.relation_id, request.parent_object_id);
 
         let relation_id = Uuid::from_str(&request.relation_id)
             .map_err(|_| Status::invalid_argument("relation_id"))?;
@@ -439,6 +451,8 @@ impl EdgeRegistry for EdgeRegistryImpl {
     ) -> Result<Response<ObjectRelations>, Status> {
         let request = request.into_inner();
 
+        trace!("Received `get_edge` message with object_id `{}`", request.object_id);
+
         let object_id = Uuid::from_str(&request.object_id)
             .map_err(|_| Status::invalid_argument("object_id"))?;
 
@@ -461,13 +475,6 @@ impl EdgeRegistry for EdgeRegistryImpl {
     }
 }
 
-#[derive(Deserialize)]
-pub struct AddEdgesMessage {
-    relation_id: Uuid,
-    parent_object_id: Uuid,
-    child_object_ids: Vec<Uuid>,
-}
-
 #[async_trait::async_trait]
 impl ConsumerHandler for EdgeRegistryImpl {
     async fn handle<'a>(&'a mut self, msg: &'a dyn CommunicationMessage) -> anyhow::Result<()> {
@@ -480,6 +487,8 @@ impl ConsumerHandler for EdgeRegistryImpl {
             edges.len().try_into().unwrap()
         );
 
+        trace!("Consuming `add_edges` with {} entries", edges.len());
+
         self.add_edges_impl(edges).await?;
 
         Ok(())
@@ -491,5 +500,5 @@ fn db_communication_error(text: &str, err: impl fmt::Debug) -> Status {
         "`{}` query failed on communication with database: `{:?}`",
         text, err
     );
-    Status::internal(text)
+    Status::internal("Query failed on communication with database")
 }

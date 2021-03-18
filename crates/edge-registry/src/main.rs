@@ -5,11 +5,10 @@ use std::process;
 use structopt::StructOpt;
 use tonic::transport::Server;
 use utils::communication::consumer::CommonConsumer;
-use utils::communication::Error;
 use utils::{metrics, status_endpoints};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let config = RegistryConfig::from_args();
 
     env_logger::init();
@@ -19,11 +18,9 @@ async fn main() {
     status_endpoints::serve();
     metrics::serve(config.metrics_port);
 
-    let registry = EdgeRegistryImpl::new(&config).await.unwrap();
+    let registry = EdgeRegistryImpl::new(&config).await?;
 
-    let consumer = CommonConsumer::new((&config.consumer_config).into())
-        .await
-        .unwrap();
+    let consumer = CommonConsumer::new((&config.consumer_config).into()).await?;
 
     let handler = registry.clone();
     tokio::spawn(async {
@@ -44,6 +41,7 @@ async fn main() {
     Server::builder()
         .add_service(EdgeRegistryServer::new(registry))
         .serve(([0, 0, 0, 0], config.communication_port).into())
-        .await
-        .unwrap();
+        .await?;
+
+    Ok(())
 }
