@@ -94,7 +94,7 @@ jobs:
         uses: actions/cache@v2.1.4
         with:
           path: target
-           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-build-target-
 
       - name: Run tests
