@@ -3,7 +3,7 @@ name: MDBook
 on:
   pull_request:
     paths:
-    - 'docs/**'
+    - "docs/**"
 jobs:
   check-mdbook:
     name: Check
@@ -20,7 +20,7 @@ jobs:
       - name: Setup mdBook
         uses: peaceiris/actions-mdbook@v1
         with:
-          mdbook-version: '0.4.6'
+          mdbook-version: "0.4.6"
 
       - name: Setup linkcheck
         run: ./.github/scripts/install-executable-from-git.sh --git Michael-F-Bryan/mdbook-linkcheck --archive-type .zip --exec-name mdbook-linkcheck
@@ -34,6 +34,8 @@ name: MDBook
 on:
   push:
     branches: [ develop ]
+    paths:
+      - "docs/**"
 jobs:
   deploy-mdbook:
     name: Deploy
@@ -52,7 +54,7 @@ jobs:
       - name: Setup mdBook
         uses: peaceiris/actions-mdbook@v1
         with:
-          mdbook-version: '0.4.6'
+          mdbook-version: "0.4.6"
 
       - name: Setup linkcheck
         run: ./.github/scripts/install-executable-from-git.sh --git Michael-F-Bryan/mdbook-linkcheck --archive-type .zip --exec-name mdbook-linkcheck

@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - "develop"
+    paths:
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - "rust-toolchain"
   pull_request:
 
 env:
@@ -68,6 +73,35 @@ jobs:
       - name: Clear bloat
         run: find . -path "./target/debug/deps*" -type f ! -name "*.*" | xargs rm
 
+---
+name: Test
+
+on:
+  push:
+    branches:
+      - "develop"
+    paths:
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - "rust-toolchain"
+      - "deployment/compose"
+      - "tests"
+      - "build.sh"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "rust-toolchain"
+      - "requirements.txt"
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUST_BACKTRACE: short
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
   component-testing:
     name: Blackbox
     runs-on: ubuntu-latest
@@ -107,6 +141,43 @@ jobs:
       - name: Stop environment
         run: docker-compose -f deployment/compose/docker-compose.yml down
 
+---
+name: Test
+
+on:
+  push:
+    branches:
+      - "develop"
+    paths:
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - "rust-toolchain"
+      - "deployment/helm"
+      - "build.sh"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "rust-toolchain"
+  pull_request:
+    paths:
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - "rust-toolchain"
+      - "deployment/helm"
+      - "build.sh"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "rust-toolchain"
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUST_BACKTRACE: short
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
   deployment-testing:
     name: Deployment
     runs-on: ubuntu-latest
